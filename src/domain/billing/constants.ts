@@ -1,0 +1,20 @@
+export const BILLING_ENGINE_VERSION = "2.0.0";
+export const MILLISECONDS_PER_DAY = 1000 * 3600 * 24;
+
+export const LIMITS = {
+  PRESUPUESTO: { MIN: 0, MAX: 1000000 },
+  KW: { MIN: 0, MAX: 100 },
+  PRECIO_KW_ANO: { MIN: 0, MAX: 10000 },
+  KWH: { MIN: 0, MAX: 100000 },
+  PRECIO_KWH: { MIN: 0, MAX: 100 },
+  ALQ_CONTADOR: { MIN: 0, MAX: 100 },
+  BONO_SOCIAL: { MIN: 0, MAX: 100000 },
+  IMPUESTO: { MIN: 0, MAX: 100 },
+  DIAS: { MIN: 1, MAX: 366 }
+};
+
+export const PEAJES_20TD = {
+  P1: 0.097553,
+  P2: 0.029267,
+  P3: 0.003292
+};

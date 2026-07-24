@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- 1. GLOBAL SAFETY NET ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- 2. GLOBAL REUSABLE PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper to get request payload
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Helper to get existing document data
+    function existing() {
+      return resource.data;
+    }
+
+    // --- 3. ENTITY VALIDATION BLUEPRINTS ---
+
+    function isValidBillData(data) {
+      return data.keys().hasAll(['fechaInicio', 'fechaFin', 'kwPunta', 'kwValle', 'kwhPunta', 'kwhLlano', 'kwhValle'])
+        && data.fechaInicio is string && data.fechaInicio.size() <= 50
+        && data.fechaFin is string && data.fechaFin.size() <= 50
+        && data.kwPunta is number && data.kwPunta >= 0 && data.kwPunta <= 100
+        && data.kwValle is number && data.kwValle >= 0 && data.kwValle <= 100
+        && data.kwhPunta is number && data.kwhPunta >= 0 && data.kwhPunta <= 100000
+        && data.kwhLlano is number && data.kwhLlano >= 0 && data.kwhLlano <= 100000
+        && data.kwhValle is number && data.kwhValle >= 0 && data.kwhValle <= 100000;
+    }
+
+    function isValidBillResults(results) {
+      return results.dias is number
+        && results.totalFijo is number
+        && results.totalVariable is number
+        && results.totalPeajes is number
+        && results.totalEnergia is number
+        && results.totalIee is number
+        && results.totalRegulados is number
+        && results.totalIva is number
+        && results.totalFactura is number
+        && results.alertaPresupuesto is bool;
+    }
+
+    function isValidHistoryEntry(entry) {
+      return entry.keys().hasAll(['id', 'dateStr', 'timestamp', 'billData', 'results', 'tipo'])
+        && isValidId(entry.id)
+        && entry.dateStr is string && entry.dateStr.size() <= 50
+        && entry.timestamp is number
+        && entry.tipo is string && (entry.tipo == 'simulacion' || entry.tipo == 'oficial')
+        && isValidBillData(entry.billData)
+        && isValidBillResults(entry.results);
+    }
+
+    function isValidSourceFile(source) {
+      return source.keys().hasAll(['id', 'name', 'timestamp', 'explanation'])
+        && isValidId(source.id)
+        && source.name is string && source.name.size() <= 200
+        && source.timestamp is number
+        && source.explanation is string && source.explanation.size() <= 10000;
+    }
+
+    function isValidChatMessage(msg) {
+      return msg.keys().hasAll(['id', 'role', 'content', 'timestamp'])
+        && isValidId(msg.id)
+        && msg.role is string && (msg.role == 'user' || msg.role == 'assistant')
+        && msg.content is string && msg.content.size() <= 50000
+        && msg.timestamp is string && msg.timestamp.size() <= 100;
+    }
+
+    // --- 4. SECURE PATH MATCHES ---
+
+    match /users/{userId} {
+      
+      // Permit active profile billData
+      match /profile/billData {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isEmailVerified() && isValidBillData(incoming());
+      }
+
+      // Permit history records
+      match /history/{entryId} {
+        allow get: if isOwner(userId) && isValidId(entryId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming());
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming()) 
+                      && incoming().id == existing().id; // prevent mutating id
+        allow delete: if isOwner(userId) && isEmailVerified() && isValidId(entryId);
+      }
+
+      // Permit sources (parsed document files)
+      match /sources/{sourceId} {
+        allow get: if isOwner(userId) && isValidId(sourceId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming());
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming())
+                      && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isEmailVerified() && isValidId(sourceId);
+      }
+
+      // Permit chat history
+      match /chats/{chatId} {
+        allow get: if isOwner(userId) && isValidId(chatId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming());
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming())
+                      && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isEmailVerified() && isValidId(chatId);
+      }
+    }
+  }
+}

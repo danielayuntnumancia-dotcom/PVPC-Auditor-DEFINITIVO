@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "BillData": {
+      "title": "BillData",
+      "description": "El formato detallado de datos de la factura de luz PVPC",
+      "type": "object",
+      "properties": {
+        "fechaInicio": { "type": "string" },
+        "fechaFin": { "type": "string" },
+        "presupuesto": { "type": "number" },
+        "kwPunta": { "type": "number" },
+        "kwValle": { "type": "number" },
+        "precioMargen": { "type": "number" },
+        "precioKwPunta": { "type": "number" },
+        "precioKwValle": { "type": "number" },
+        "kwhPunta": { "type": "number" },
+        "kwhLlano": { "type": "number" },
+        "kwhValle": { "type": "number" },
+        "precioKwhPunta": { "type": "number" },
+        "precioKwhLlano": { "type": "number" },
+        "precioKwhValle": { "type": "number" },
+        "costeEnergiaVariable": { "type": "number" },
+        "costeEnergiaPunta": { "type": "number" },
+        "costeEnergiaLlano": { "type": "number" },
+        "costeEnergiaValle": { "type": "number" },
+        "alqContador": { "type": "number" },
+        "bonoSocial": { "type": "number" },
+        "iee": { "type": "number" },
+        "iva": { "type": "number" }
+      },
+      "required": ["fechaInicio", "fechaFin", "kwPunta", "kwValle", "kwhPunta", "kwhLlano", "kwhValle"]
+    },
+    "BillResults": {
+      "title": "BillResults",
+      "description": "Resultados calculados de la factura",
+      "type": "object",
+      "properties": {
+        "dias": { "type": "number" },
+        "totalFijo": { "type": "number" },
+        "totalVariable": { "type": "number" },
+        "totalPeajes": { "type": "number" },
+        "totalEnergia": { "type": "number" },
+        "totalIee": { "type": "number" },
+        "totalRegulados": { "type": "number" },
+        "totalIva": { "type": "number" },
+        "totalFactura": { "type": "number" },
+        "alertaPresupuesto": { "type": "boolean" }
+      }
+    },
+    "HistoryEntry": {
+      "title": "HistoryEntry",
+      "description": "Un registro en el historial de facturas o simulaciones",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dateStr": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "billData": { "type": "object", "$ref": "#/entities/BillData" },
+        "results": { "type": "object", "$ref": "#/entities/BillResults" },
+        "tipo": { "type": "string", "enum": ["simulacion", "oficial"] },
+        "mesFacturacion": { "type": "string" }
+      },
+      "required": ["id", "dateStr", "timestamp", "billData", "results", "tipo"]
+    },
+    "SourceFile": {
+      "title": "SourceFile",
+      "description": "Información de facturas escaneadas por IA",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "explanation": { "type": "string" },
+        "parsedData": { "type": "object", "$ref": "#/entities/BillData" }
+      },
+      "required": ["id", "name", "timestamp", "explanation"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Mensaje individual en el chat de auditoría",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "sourceFileId": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["id", "role", "content", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/history/{entryId}": {
+      "schema": "HistoryEntry",
+      "description": "Historial de facturas y simulaciones del usuario"
+    },
+    "users/{userId}/sources/{sourceId}": {
+      "schema": "SourceFile",
+      "description": "Facturas escaneadas y analizadas"
+    },
+    "users/{userId}/chats/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "Historial del chat de asesoramiento de energía"
+    },
+    "users/{userId}/profile/billData": {
+      "schema": "BillData",
+      "description": "Último estado activo del formulario de la calculadora"
+    }
+  }
+}

@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PVP Auditor - Auditoría de Consumo de Luz</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      header {
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+        animation: slideDown 0.6s ease-out;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      #user-info {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border-radius: 8px;
+        padding: 12px 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .user-info-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+
+      /* Login Section */
+      #login-section {
+        background: white;
+        border-radius: 12px;
+        padding: 60px 40px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        animation: fadeIn 0.8s ease-out;
+      }
+
+      #login-section h2 {
+        font-size: 2rem;
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      #login-section p {
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 40px;
+        line-height: 1.6;
+      }
+
+      #login-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 16px 40px;
+        font-size: 1.1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      #login-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+      }
+
+      #login-btn:active {
+        transform: translateY(0);
+      }
+
+      /* App Section */
+      #app-section {
+        display: none;
+        animation: fadeIn 0.8s ease-out;
+      }
+
+      .app-content {
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+
+      .app-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #f0f0f0;
+      }
+
+      .app-header h2 {
+        color: #333;
+        font-size: 1.8rem;
+      }
+
+      #logout-btn {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+      }
+
+      #logout-btn:hover {
+        background: #c0392b;
+        transform: translateY(-2px);
+      }
+
+      /* Form Styles */
+      #consumo-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .form-group label {
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+        font-size: 0.95rem;
+      }
+
+      .form-group input {
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+      }
+
+      .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .form-submit {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      button[type="submit"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      }
+
+      button[type="submit"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      button[type="submit"]:active {
+        transform: translateY(0);
+      }
+
+      /* Stats Section */
+      #consumos-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+        animation: slideUp 0.6s ease-out;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+      }
+
+      /* List Section */
+      .list-header {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #consumos-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+      }
+
+      .consumo-item {
+        background: #f9f9f9;
+        border-left: 4px solid #667eea;
+        padding: 20px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s, box-shadow 0.2s;
+        animation: slideUp 0.4s ease-out;
+      }
+
+      .consumo-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .consumo-date {
+        font-weight: 600;
+        color: #667eea;
+        font-size: 1rem;
+        margin-bottom: 10px;
+      }
+
+      .consumo-details {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .consumo-kwh {
+        background: #e8f0fe;
+        color: #667eea;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .consumo-cost {
+        background: #f0f9ff;
+        color: #1e40af;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .no-records {
+        text-align: center;
+        color: #999;
+        padding: 40px;
+        font-style: italic;
+      }
+
+      /* Notifications */
+      .notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        border-radius: 6px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        transform: translateY(100px);
+        transition: opacity 0.3s, transform 0.3s;
+        z-index: 1000;
+        max-width: 400px;
+      }
+
+      .notification.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .notification-success {
+        background: #4caf50;
+        color: white;
+      }
+
+      .notification-error {
+        background: #f44336;
+        color: white;
+      }
+
+      .notification-info {
+        background: #2196f3;
+        color: white;
+      }
+
+      /* Animations */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 1.8rem;
+        }
+
+        #login-section {
+          padding: 40px 20px;
+        }
+
+        #login-section h2 {
+          font-size: 1.5rem;
+        }
+
+        .app-content {
+          padding: 20px;
+        }
+
+        #consumo-form {
+          grid-template-columns: 1fr;
+        }
+
+        .form-submit {
+          grid-column: 1;
+        }
+
+        #user-info {
+          position: static;
+          margin-bottom: 20px;
+        }
+
+        .app-header {
+          flex-direction: column;
+          gap: 15px;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>⚡ PVP Auditor</h1>
+        <p>Auditoría inteligente de consumo de luz con Firebase</p>
+      </header>
+
+      <div id="user-info"></div>
+
+      <!-- Login Section -->
+      <section id="login-section" class="app-section-login">
+        <h2>Bienvenido a PVP Auditor</h2>
+        <p>
+          Registra y audita tu consumo de luz de forma segura y sincronizada.
+          <br />Inicia sesión con tu cuenta de Google para comenzar.
+        </p>
+        <button id="login-btn">🔐 Iniciar sesión con Google</button>
+      </section>
+
+      <!-- Application Section (Hidden until authenticated) -->
+      <section id="app-section">
+        <!-- App Header -->
+        <div class="app-content">
+          <div class="app-header">
+            <h2>Panel de Control</h2>
+            <button id="logout-btn">Cerrar sesión</button>
+          </div>
+
+          <!-- Consumption Form -->
+          <form id="consumo-form">
+            <div class="form-group">
+              <label for="consumo-fecha">📅 Fecha del consumo</label>
+              <input
+                type="date"
+                id="consumo-fecha"
+                name="fecha"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="consumo-kwh">⚡ Consumo (kWh)</label>
+              <input
+                type="number"
+                id="consumo-kwh"
+                name="kwh"
+                step="0.01"
+                min="0"
+                placeholder="Ej: 250.50"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="consumo-costo">💰 Costo ($)</label>
+              <input
+                type="number"
+                id="consumo-costo"
+                name="costo"
+                step="0.01"
+                min="0"
+                placeholder="Ej: 45.99"
+                required
+              />
+            </div>
+
+            <div class="form-submit">
+              <button type="submit">✅ Guardar Consumo</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="app-content">
+          <h3 class="list-header">📊 Estadísticas</h3>
+          <div id="consumos-stats">
+            <div class="stat-card">
+              <div class="stat-label">Cargando...</div>
+              <div class="stat-value">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Consumption List Section -->
+        <div class="app-content">
+          <h3 class="list-header">📋 Registro de Consumos</h3>
+          <div id="consumos-list">
+            <p class="no-records">Cargando registros...</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Load Firebase App -->
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
+
