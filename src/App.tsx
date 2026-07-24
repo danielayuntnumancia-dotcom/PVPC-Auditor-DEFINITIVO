@@ -1049,7 +1049,10 @@ export default function App() {
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-emerald-400 fill-current" />
-          <span className="font-bold text-sm tracking-tight text-white">PVPC AUDITOR</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm tracking-tight text-white leading-none">PVPC AUDITOR</span>
+            <span className="text-[8px] text-slate-500 font-mono">v4.1 Debug</span>
+          </div>
         </div>
         
         {isFirebaseConfigured && (
@@ -1307,6 +1310,9 @@ export default function App() {
         </nav>
 
         <div className="pt-4 border-t border-slate-800 space-y-3">
+          <div className="px-2 py-1 text-[8px] font-mono text-slate-600">
+            Firebase Status: {isFirebaseConfigured ? 'ON' : 'OFF'}
+          </div>
           {isFirebaseConfigured ? (
             user ? (
               <div className="space-y-2 px-1 text-left">
@@ -1345,7 +1351,7 @@ export default function App() {
             </div>
           )}
           
-          <p className="text-[10px] text-slate-500 font-mono text-center">v4.0 • Tarifa PVPC 2.0TD</p>
+          <p className="text-[10px] text-slate-500 font-mono text-center">v4.1 • Tarifa PVPC 2.0TD</p>
         </div>
       </aside>
 

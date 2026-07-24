@@ -1,5 +1,5 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth, type UserInfo } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, type Auth, type UserInfo } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
 import firebaseConfigJson from './firebase-applet-config.json';
 
@@ -33,17 +33,24 @@ const firebaseConfig: FirebaseConfig = {
 };
 
 // Safe checking if config is populated
-export const isFirebaseConfigured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId);
+export const isFirebaseConfigured = !!(firebaseConfigJson && firebaseConfigJson.apiKey && firebaseConfigJson.projectId);
 
 let app: FirebaseApp | undefined;
 let dbInstance: Firestore | null = null;
 let authInstance: Auth | null = null;
 
-if (isFirebaseConfigured) {
+const finalConfig = isFirebaseConfigured ? {
+  ...firebaseConfigJson,
+  ...Object.fromEntries(
+    Object.entries(firebaseEnvConfig).filter(([, value]) => value !== undefined && value !== '')
+  ),
+} : null;
+
+if (isFirebaseConfigured && finalConfig) {
   try {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    app = getApps().length === 0 ? initializeApp(finalConfig) : getApp();
     // CRITICAL: Must use firestoreDatabaseId if provided, or default database
-    dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+    dbInstance = getFirestore(app, finalConfig.firestoreDatabaseId || '(default)');
     authInstance = getAuth(app);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -56,6 +63,10 @@ export const auth = authInstance;
 
 // Auth Provider
 export const googleProvider = isFirebaseConfigured ? new GoogleAuthProvider() : null;
+
+if (googleProvider) {
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+}
 
 // Validate Connection (from Firebase Integration guidelines)
 export async function testConnection() {
@@ -129,7 +140,7 @@ export async function loginWithGoogle() {
   if (!isFirebaseConfigured || !authInstance || !googleProvider) {
     throw new Error("Firebase is not fully configured yet.");
   }
-  return signInWithPopup(authInstance, googleProvider);
+  return signInWithRedirect(authInstance, googleProvider);
 }
 
 export async function logoutUser() {

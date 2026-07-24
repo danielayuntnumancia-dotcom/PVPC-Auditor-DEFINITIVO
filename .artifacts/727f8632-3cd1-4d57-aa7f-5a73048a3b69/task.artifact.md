@@ -1,0 +1,3 @@
+- [x] Configurar credenciales en `firebase-applet-config.json`
+- [x] Cambiar `signInWithPopup` por `signInWithRedirect` en `firebase.ts`
+- [ ] Documentar pasos de despliegue para el usuario

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "302419656848",
+    "project_id": "gen-lang-client-0735328299",
+    "storage_bucket": "gen-lang-client-0735328299.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:302419656848:android:9f1e93210d099bd3249815",
+        "android_client_info": {
+          "package_name": "es.numancia.pvpcauditor"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "302419656848-ujf4c54e42une6sel94mc9mjj25ch62t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYQAs8iSuVjW5Au4ylhujnvXBiYZBgqlk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "302419656848-ujf4c54e42une6sel94mc9mjj25ch62t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
