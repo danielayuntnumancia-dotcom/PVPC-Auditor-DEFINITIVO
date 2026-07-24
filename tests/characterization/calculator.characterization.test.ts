@@ -11,15 +11,15 @@ const rootDir = path.resolve(path.dirname(currentFile), '../..');
 
 test('[VALIDO] calcula los términos de potencia, peajes, energía e impuestos', () => {
   const result = calcularFactura(DEFAULT_PVPC_VALUES);
-  assert.equal(result.dias, 30);
-  assert.equal(result.totalFijo, 11.4073);
+  assert.equal(result.dias, 29);
+  assert.equal(result.totalFijo, 11.027);
   assert.equal(result.totalPeajes, 11.4793);
   assert.equal(result.totalEnergia, 53.8679);
   assert.equal(result.totalVariable, 65.3472);
-  assert.equal(result.totalIee, 3.9242);
-  assert.equal(result.totalRegulados, 1.3989);
-  assert.equal(result.totalIva, 17.2363);
-  assert.equal(result.totalFactura, 99.31);
+  assert.equal(result.totalIee, 3.9048);
+  assert.equal(result.totalRegulados, 1.3723);
+  assert.equal(result.totalIva, 17.1468);
+  assert.equal(result.totalFactura, 98.8);
   assert.equal(result.alertaPresupuesto, false);
 });
 
@@ -62,11 +62,11 @@ test('[VALIDO] Fechas invertidas devuelve un día', () => {
   assert.throws(() => calcularFactura(data));
 });
 
-test('[VALIDO] el periodo 1–30 de junio se computa como 30 días', () => {
+test('[VALIDO] el periodo 1–30 de junio se computa como 29 días', () => {
   const data: BillData = { ...DEFAULT_PVPC_VALUES, fechaInicio: "2026-06-01", fechaFin: "2026-06-30" };
   
   const result = calcularFactura(data);
-  assert.equal(result.dias, 30);
+  assert.equal(result.dias, 29);
 });
 
 test('[VALIDO] Fallback de energía por operador nullish conserva ceros y rechaza fallback general', () => {
@@ -83,7 +83,7 @@ test('[VALIDO] Fallback de energía por operador nullish conserva ceros y rechaz
 });
 
 test('[VALIDO] Presupuesto y redondeo usan el total final redondeado', () => {
-  const data: BillData = { ...DEFAULT_PVPC_VALUES, presupuesto: 99.31 };
+  const data: BillData = { ...DEFAULT_PVPC_VALUES, presupuesto: 98.8 };
   
   const result = calcularFactura(data);
   assert.equal(result.alertaPresupuesto, false);

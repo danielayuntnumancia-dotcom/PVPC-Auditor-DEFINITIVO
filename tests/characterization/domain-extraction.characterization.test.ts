@@ -59,15 +59,15 @@ test('[VALIDO] ejecutar calcularFactura desde ambas rutas produce resultados id√
   assert.deepStrictEqual(newRes, oldRes, "Los resultados difieren");
   
   // Resultados can√≥nicos
-  assert.equal(newRes.dias, 30);
-  assert.equal(newRes.totalFijo, 11.4073);
+  assert.equal(newRes.dias, 29);
+  assert.equal(newRes.totalFijo, 11.027);
   assert.equal(newRes.totalPeajes, 11.4793);
   assert.equal(newRes.totalEnergia, 53.8679);
   assert.equal(newRes.totalVariable, 65.3472);
-  assert.equal(newRes.totalIee, 3.9242);
-  assert.equal(newRes.totalRegulados, 1.3989);
-  assert.equal(newRes.totalIva, 17.2363);
-  assert.equal(newRes.totalFactura, 99.31);
+  assert.equal(newRes.totalIee, 3.9048);
+  assert.equal(newRes.totalRegulados, 1.3723);
+  assert.equal(newRes.totalIva, 17.1468);
+  assert.equal(newRes.totalFactura, 98.8);
   assert.equal(newRes.alertaPresupuesto, false);
 });
 

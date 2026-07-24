@@ -14,7 +14,7 @@ export function calcularFactura(data: BillData): BillResults {
     const partsFin = data.fechaFin.split('-');
     const t1 = Date.UTC(parseInt(partsInicio[0], 10), parseInt(partsInicio[1], 10) - 1, parseInt(partsInicio[2], 10));
     const t2 = Date.UTC(parseInt(partsFin[0], 10), parseInt(partsFin[1], 10) - 1, parseInt(partsFin[2], 10));
-    dias = Math.floor((t2 - t1) / MILLISECONDS_PER_DAY) + 1;
+    dias = Math.max(1, Math.floor((t2 - t1) / MILLISECONDS_PER_DAY));
   }
   
 

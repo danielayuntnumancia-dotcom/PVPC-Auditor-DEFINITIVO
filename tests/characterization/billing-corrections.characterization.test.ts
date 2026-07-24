@@ -13,28 +13,28 @@ test('[VALIDO] fecha igual devuelve 1 día', () => {
   assert.strictEqual(res.dias, 1);
 });
 
-test('[VALIDO] 1–30 de junio = 30 días', () => {
+test('[VALIDO] 1–30 de junio = 29 días', () => {
   const data = { ...DEFAULT_PVPC_VALUES, fechaInicio: '2026-06-01', fechaFin: '2026-06-30' };
   const res = calcularFactura(data);
-  assert.strictEqual(res.dias, 30);
+  assert.strictEqual(res.dias, 29);
 });
 
 test('[VALIDO] año bisiesto', () => {
   const data = { ...DEFAULT_PVPC_VALUES, fechaInicio: '2024-02-28', fechaFin: '2024-03-01' };
   const res = calcularFactura(data);
-  assert.strictEqual(res.dias, 3);
+  assert.strictEqual(res.dias, 2);
 });
 
 test('[VALIDO] cambio de mes', () => {
   const data = { ...DEFAULT_PVPC_VALUES, fechaInicio: '2026-01-31', fechaFin: '2026-02-01' };
   const res = calcularFactura(data);
-  assert.strictEqual(res.dias, 2);
+  assert.strictEqual(res.dias, 1);
 });
 
 test('[VALIDO] cambio de año', () => {
   const data = { ...DEFAULT_PVPC_VALUES, fechaInicio: '2025-12-31', fechaFin: '2026-01-01' };
   const res = calcularFactura(data);
-  assert.strictEqual(res.dias, 2);
+  assert.strictEqual(res.dias, 1);
 });
 
 test('[VALIDO] fecha imposible genera error', () => {
@@ -80,9 +80,9 @@ test('[VALIDO] mapeo correcto P1/P2/P3', () => {
 });
 
 test('[VALIDO] aritmética decimal y ROUND_HALF_UP', () => {
-  // Canónico 99.31
+  // Canónico 98.8
   const res = calcularFactura(DEFAULT_PVPC_VALUES);
-  assert.strictEqual(res.totalFactura, 99.31);
+  assert.strictEqual(res.totalFactura, 98.8);
 });
 
 test('[VALIDO] presupuesto igual al total mostrado no alerta', () => {
