@@ -23,7 +23,20 @@ let consumosUnsubscribe = null;
  * Captures the uid of the user when they log in and manages auth UI
  */
 export function initAuthStateListener() {
-  onAuthStateChanged(auth, (user) => {
+  const ALLOWED_EMAILS = [
+    'daniel.ayuntnumancia@gmail.com'
+  ];
+
+  onAuthStateChanged(auth, async (user) => {
+    // Check whitelist if user is logged in
+    if (user && user.email && !ALLOWED_EMAILS.includes(user.email)) {
+      console.warn(`Access denied for unauthorized email: ${user.email}`);
+      await signOutUser();
+      currentUser = null;
+      showNotification('Acceso denegado: Este correo no tiene permiso', 'error');
+      return;
+    }
+
     currentUser = user;
     
     if (user) {

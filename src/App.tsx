@@ -387,7 +387,20 @@ export default function App() {
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) return;
 
+    const ALLOWED_EMAILS = [
+      'daniel.ayuntnumancia@gmail.com'
+    ];
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Check if user is logged in and their email is in the allowed list
+      if (firebaseUser && firebaseUser.email && !ALLOWED_EMAILS.includes(firebaseUser.email)) {
+        console.warn(`Access denied for unauthorized email: ${firebaseUser.email}`);
+        await logoutUser();
+        setUser(null);
+        alert('Acceso denegado: Este correo no tiene permiso para usar la aplicación.');
+        return;
+      }
+
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
