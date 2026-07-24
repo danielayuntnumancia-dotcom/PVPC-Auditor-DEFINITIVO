@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">PVPC Auditor</string>
-    <string name="title_activity_main">PVPC Auditor</string>
-    <string name="package_name">es.numancia.pvpcauditor</string>
-    <string name="custom_url_scheme">es.numancia.pvpcauditor</string>
-</resources>
