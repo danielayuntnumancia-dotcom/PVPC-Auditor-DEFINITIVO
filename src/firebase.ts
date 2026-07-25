@@ -1,4 +1,5 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth, type UserInfo } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
 import firebaseConfigJson from './firebase-applet-config.json';
@@ -49,6 +50,15 @@ const finalConfig = isFirebaseConfigured ? {
 if (isFirebaseConfigured && finalConfig) {
   try {
     app = getApps().length === 0 ? initializeApp(finalConfig) : getApp();
+    
+    // Inicializar Firebase App Check con reCAPTCHA Enterprise
+    if (typeof window !== 'undefined') {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider('6Ld2pmQtAAAAAKmv6PQqf-mKZct2F-iYJZcWCsip'),
+        isTokenAutoRefreshEnabled: true
+      });
+    }
+
     // CRITICAL: Must use firestoreDatabaseId if provided, or default database
     dbInstance = getFirestore(app, finalConfig.firestoreDatabaseId || '(default)');
     authInstance = getAuth(app);
