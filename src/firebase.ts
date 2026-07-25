@@ -54,7 +54,7 @@ if (isFirebaseConfigured && finalConfig) {
     // Inicializar Firebase App Check con reCAPTCHA Enterprise
     if (typeof window !== 'undefined') {
       initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider('6Ld2pmQtAAAAAKmv6PQqf-mKZct2F-iYJZcWCsip'),
+        provider: new ReCaptchaEnterpriseProvider('6LeylmQtAAAAAPLvr0tEAe9GrwRVsQ6VEQ7MtOJ2'),
         isTokenAutoRefreshEnabled: true
       });
     }
