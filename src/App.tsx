@@ -1555,9 +1555,9 @@ export default function App() {
                         }}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer mb-1.5"
                       >
-                        <option value="standard">5,11269632% (Estándar)</option>
-                        <option value="mincomunitario">Mínimo comunitario (€/kWh)</option>
-                        <option value="custom">Personalizado (%)</option>
+                        <option value="standard">5,11269632%</option>
+                        <option value="mincomunitario">Mínimo</option>
+                        <option value="custom">Personalizado</option>
                       </select>
                       {/* Mínimo comunitario: input €/kWh */}
                       <input 
