@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return isSignedIn();
+      return isSignedIn() && request.auth.token.email == 'daniel.ayuntnumancia@gmail.com';
     }
 
     function isOwner(userId) {
@@ -50,9 +50,18 @@ service cloud.firestore {
     function isValidBillResults(results) {
       return results.dias is number
         && results.totalFijo is number
+        && results.fijoPunta is number
+        && results.fijoValle is number
+        && results.fijoMargen is number
         && results.totalVariable is number
         && results.totalPeajes is number
+        && results.peajesPunta is number
+        && results.peajesLlano is number
+        && results.peajesValle is number
         && results.totalEnergia is number
+        && results.energiaPunta is number
+        && results.energiaLlano is number
+        && results.energiaValle is number
         && results.totalIee is number
         && results.totalRegulados is number
         && results.totalIva is number

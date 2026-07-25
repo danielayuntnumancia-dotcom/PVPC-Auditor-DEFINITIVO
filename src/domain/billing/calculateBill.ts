@@ -8,12 +8,16 @@ export function calcularFactura(data: BillData): BillResults {
   assertValidBillData(data);
 
   // 2. Parse dates strictly and calculate days
+  let startYear = 0;
+  let endYear = 0;
   let dias = 1;
   if (data.fechaInicio && data.fechaFin) {
     const partsInicio = data.fechaInicio.split('-');
     const partsFin = data.fechaFin.split('-');
-    const t1 = Date.UTC(parseInt(partsInicio[0], 10), parseInt(partsInicio[1], 10) - 1, parseInt(partsInicio[2], 10));
-    const t2 = Date.UTC(parseInt(partsFin[0], 10), parseInt(partsFin[1], 10) - 1, parseInt(partsFin[2], 10));
+    startYear = parseInt(partsInicio[0], 10);
+    endYear = parseInt(partsFin[0], 10);
+    const t1 = Date.UTC(startYear, parseInt(partsInicio[1], 10) - 1, parseInt(partsInicio[2], 10));
+    const t2 = Date.UTC(endYear, parseInt(partsFin[1], 10) - 1, parseInt(partsFin[2], 10));
     dias = Math.max(1, Math.floor((t2 - t1) / MILLISECONDS_PER_DAY));
   }
   
@@ -27,11 +31,15 @@ export function calcularFactura(data: BillData): BillResults {
   const dKwValle = new Decimal(data.kwValle);
   const dPrecioKwValle = new Decimal(data.precioKwValle);
   const dPrecioMargen = new Decimal(data.precioMargen);
-  const d365 = new Decimal(365);
+  const isLeapYear = (year: number) => (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+  const daysInYear = (startYear > 0 && endYear > 0) 
+    ? (isLeapYear(startYear) || isLeapYear(endYear) ? 366 : 365)
+    : 365;
+  const dDivisor = new Decimal(daysInYear);
 
-  const costePuntaFijo = dKwPunta.mul(dPrecioKwPunta).mul(dDias).div(d365);
-  const costeValleFijo = dKwValle.mul(dPrecioKwValle).mul(dDias).div(d365);
-  const costeMargen = dKwPunta.mul(dPrecioMargen).mul(dDias).div(d365);
+  const costePuntaFijo = dKwPunta.mul(dPrecioKwPunta).mul(dDias).div(dDivisor);
+  const costeValleFijo = dKwValle.mul(dPrecioKwValle).mul(dDias).div(dDivisor);
+  const costeMargen = dKwPunta.mul(dPrecioMargen).mul(dDias).div(dDivisor);
   const totalFijo = costePuntaFijo.plus(costeValleFijo).plus(costeMargen);
 
   // 2. Término Variable (Energía Consumida + Peajes de Acceso)
