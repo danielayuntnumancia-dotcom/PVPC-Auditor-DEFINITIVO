@@ -39,6 +39,10 @@ export interface BillData {
 export interface BillResults {
   dias: number;
   totalFijo: number;
+  // Término Fijo desglosado
+  fijoPunta: number;   // P1 (punta): kW × €/kW/año × días/365
+  fijoValle: number;   // P2 (valle): kW × €/kW/año × días/365
+  fijoMargen: number;  // Margen de comercialización fijo
   totalVariable: number;
   // Peajes desglosados por periodo
   totalPeajes: number;

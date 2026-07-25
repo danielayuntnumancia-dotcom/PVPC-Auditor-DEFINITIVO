@@ -1910,10 +1910,21 @@ export default function App() {
                         <span>Término Fijo (Potencia)</span>
                         <span className="font-mono text-white">{results.totalFijo.toFixed(2)} €</span>
                       </div>
-                      
-                      <div className="flex justify-between items-center text-slate-300 pl-3 border-l-2 border-slate-800 text-xs">
-                        <span className="text-slate-400">Peajes de Potencia y Margen</span>
-                        <span className="font-mono">{(results.totalFijo - ((billData.kwPunta * billData.precioMargen * results.dias) / 365)).toFixed(2)} €</span>
+
+                      <div className="pl-3 border-l border-dashed border-slate-700 text-[11px] space-y-0.5">
+                        <div className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Peajes de Potencia y Margen</div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• P1 (Punta): {billData.kwPunta} kW × {billData.precioKwPunta.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span className="font-mono">{results.fijoPunta.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• P2 (Valle): {billData.kwValle} kW × {billData.precioKwValle.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span className="font-mono">{results.fijoValle.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Margen comercialización: {billData.kwPunta} kW × {billData.precioMargen.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span className="font-mono">{results.fijoMargen.toFixed(2)} €</span>
+                        </div>
                       </div>
 
                       <div className="flex justify-between items-center text-slate-300">

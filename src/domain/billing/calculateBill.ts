@@ -91,6 +91,9 @@ export function calcularFactura(data: BillData): BillResults {
   const totalFactura = baseImponible.plus(totalIva);
 
   const outTotalFijo = totalFijo.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outFijoPunta = costePuntaFijo.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outFijoValle = costeValleFijo.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outFijoMargen = costeMargen.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalVariable = totalVariable.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outPeajesPunta = costePeajesPunta.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outPeajesLlano = costePeajesLlano.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
@@ -110,6 +113,9 @@ export function calcularFactura(data: BillData): BillResults {
   return {
     dias,
     totalFijo: outTotalFijo,
+    fijoPunta: outFijoPunta,
+    fijoValle: outFijoValle,
+    fijoMargen: outFijoMargen,
     totalVariable: outTotalVariable,
     totalPeajes: outTotalPeajes,
     peajesPunta: outPeajesPunta,
