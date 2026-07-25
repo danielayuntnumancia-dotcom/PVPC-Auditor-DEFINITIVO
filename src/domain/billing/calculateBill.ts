@@ -42,9 +42,10 @@ export function calcularFactura(data: BillData): BillResults {
   const dKwhValle = new Decimal(data.kwhValle);
   const dPrecioKwhValle = new Decimal(data.precioKwhValle);
 
-  const costePeajes = dKwhPunta.mul(dPrecioKwhPunta)
-    .plus(dKwhLlano.mul(dPrecioKwhLlano))
-    .plus(dKwhValle.mul(dPrecioKwhValle));
+  const costePeajesPunta = dKwhPunta.mul(dPrecioKwhPunta);
+  const costePeajesLlano = dKwhLlano.mul(dPrecioKwhLlano);
+  const costePeajesValle = dKwhValle.mul(dPrecioKwhValle);
+  const costePeajes = costePeajesPunta.plus(costePeajesLlano).plus(costePeajesValle);
                       
   const dCosteEnergiaPunta = data.costeEnergiaPunta !== undefined && data.costeEnergiaPunta !== null 
       ? new Decimal(data.costeEnergiaPunta) 
@@ -56,16 +57,25 @@ export function calcularFactura(data: BillData): BillResults {
       ? new Decimal(data.costeEnergiaValle) 
       : new Decimal(0);
 
-  const costeEnergia = dKwhPunta.mul(dCosteEnergiaPunta)
-    .plus(dKwhLlano.mul(dCosteEnergiaLlano))
-    .plus(dKwhValle.mul(dCosteEnergiaValle));
+  const costeEnergiaPuntaTotal = dKwhPunta.mul(dCosteEnergiaPunta);
+  const costeEnergiaLlanoTotal = dKwhLlano.mul(dCosteEnergiaLlano);
+  const costeEnergiaValleTotal = dKwhValle.mul(dCosteEnergiaValle);
+  const costeEnergia = costeEnergiaPuntaTotal.plus(costeEnergiaLlanoTotal).plus(costeEnergiaValleTotal);
                        
   const totalVariable = costePeajes.plus(costeEnergia);
 
-  // 3. Impuesto sobre la Electricidad (IEE) sobre Base Eléctrica
+  // 3. Impuesto sobre la Electricidad (IEE)
+  // Modo A: mínimo comunitario → totalKwh × tarifa €/kWh
+  // Modo B: porcentaje estándar → base eléctrica × %
   const baseElectrica = totalFijo.plus(totalVariable);
-  const dIee = new Decimal(data.iee).div(100);
-  const totalIee = baseElectrica.mul(dIee);
+  let totalIee: Decimal;
+  if (data.ieeMinComunitario !== undefined && data.ieeMinComunitario > 0) {
+    const totalKwh = dKwhPunta.plus(dKwhLlano).plus(dKwhValle);
+    totalIee = totalKwh.mul(new Decimal(data.ieeMinComunitario));
+  } else {
+    const dIee = new Decimal(data.iee).div(100);
+    totalIee = baseElectrica.mul(dIee);
+  }
 
   // 4. Conceptos Regulados
   const dBonoSocial = new Decimal(data.bonoSocial);
@@ -80,10 +90,15 @@ export function calcularFactura(data: BillData): BillResults {
   // 6. Importe Total
   const totalFactura = baseImponible.plus(totalIva);
 
-  // Rounding
   const outTotalFijo = totalFijo.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalVariable = totalVariable.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outPeajesPunta = costePeajesPunta.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outPeajesLlano = costePeajesLlano.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outPeajesValle = costePeajesValle.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalPeajes = costePeajes.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outEnergiaPunta = costeEnergiaPuntaTotal.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outEnergiaLlano = costeEnergiaLlanoTotal.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outEnergiaValle = costeEnergiaValleTotal.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalEnergia = costeEnergia.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalIee = totalIee.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalRegulados = totalRegulados.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
@@ -97,7 +112,13 @@ export function calcularFactura(data: BillData): BillResults {
     totalFijo: outTotalFijo,
     totalVariable: outTotalVariable,
     totalPeajes: outTotalPeajes,
+    peajesPunta: outPeajesPunta,
+    peajesLlano: outPeajesLlano,
+    peajesValle: outPeajesValle,
     totalEnergia: outTotalEnergia,
+    energiaPunta: outEnergiaPunta,
+    energiaLlano: outEnergiaLlano,
+    energiaValle: outEnergiaValle,
     totalIee: outTotalIee,
     totalRegulados: outTotalRegulados,
     totalIva: outTotalIva,
