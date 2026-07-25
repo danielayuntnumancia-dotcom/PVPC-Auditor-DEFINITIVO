@@ -1,5 +1,5 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, type Auth, type UserInfo } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth, type UserInfo } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
 import firebaseConfigJson from './firebase-applet-config.json';
 
@@ -140,7 +140,7 @@ export async function loginWithGoogle() {
   if (!isFirebaseConfigured || !authInstance || !googleProvider) {
     throw new Error("Firebase is not fully configured yet.");
   }
-  return signInWithRedirect(authInstance, googleProvider);
+  return signInWithPopup(authInstance, googleProvider);
 }
 
 export async function logoutUser() {
