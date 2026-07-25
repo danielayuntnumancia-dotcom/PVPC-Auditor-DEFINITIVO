@@ -1,9 +1,9 @@
 {
-  "apiKey": "",
-  "authDomain": "",
-  "projectId": "",
-  "storageBucket": "",
-  "messagingSenderId": "",
-  "appId": "",
+  "apiKey": "AIzaSyBQtphxt8ayxbOCdD1NlqVWckZyTJBsnEI",
+  "authDomain": "gen-lang-client-0735328299.firebaseapp.com",
+  "projectId": "gen-lang-client-0735328299",
+  "storageBucket": "gen-lang-client-0735328299.appspot.com",
+  "messagingSenderId": "302419656848",
+  "appId": "1:302419656848:web:53173d120a160869249815",
   "firestoreDatabaseId": "(default)"
 }

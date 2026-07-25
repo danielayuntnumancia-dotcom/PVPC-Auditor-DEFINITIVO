@@ -292,24 +292,34 @@ export default function App() {
     return safeParse<BillData | null>(localStorage.getItem('pvpc_bill_data'), DEFAULT_PVPC_VALUES) || DEFAULT_PVPC_VALUES;
   });
 
-  const [ieeSelection, setIeeSelection] = useState<'standard' | 'custom'>(() => {
+  const [ieeSelection, setIeeSelection] = useState<'standard' | 'mincomunitario' | 'custom'>(() => {
+    if ((billData.ieeMinComunitario ?? 0) > 0) return 'mincomunitario';
     const currentVal = billData.iee;
     return (currentVal === 5.11269632 || currentVal === 5.112696) ? 'standard' : 'custom';
   });
 
   useEffect(() => {
-    const currentVal = billData.iee;
-    setIeeSelection((currentVal === 5.11269632 || currentVal === 5.112696) ? 'standard' : 'custom');
-  }, [billData.iee]);
+    if ((billData.ieeMinComunitario ?? 0) > 0) {
+      setIeeSelection('mincomunitario');
+    } else {
+      const currentVal = billData.iee;
+      setIeeSelection((currentVal === 5.11269632 || currentVal === 5.112696) ? 'standard' : 'custom');
+    }
+  }, [billData.iee, billData.ieeMinComunitario]);
 
-  const [editIeeSelection, setEditIeeSelection] = useState<'standard' | 'custom'>('standard');
+  const [editIeeSelection, setEditIeeSelection] = useState<'standard' | 'mincomunitario' | 'custom'>('standard');
 
   useEffect(() => {
     if (editBillData) {
-      const currentVal = editBillData.iee;
-      setEditIeeSelection((currentVal === 5.11269632 || currentVal === 5.112696) ? 'standard' : 'custom');
+      if ((editBillData.ieeMinComunitario ?? 0) > 0) {
+        setEditIeeSelection('mincomunitario');
+      } else {
+        const currentVal = editBillData.iee;
+        setEditIeeSelection((currentVal === 5.11269632 || currentVal === 5.112696) ? 'standard' : 'custom');
+      }
     }
-  }, [editBillData?.iee]);
+  }, [editBillData?.iee, editBillData?.ieeMinComunitario]);
+
   const hasError = (fieldName: string) => validationResult.errors.some(e => e.field === fieldName);
 
   const validationResult = validateBillData(billData);
@@ -1049,7 +1059,10 @@ export default function App() {
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-emerald-400 fill-current" />
-          <span className="font-bold text-sm tracking-tight text-white">PVPC AUDITOR</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm tracking-tight text-white leading-none">PVPC AUDITOR</span>
+            <span className="text-[8px] text-slate-500 font-mono">v4.1 Debug</span>
+          </div>
         </div>
         
         {isFirebaseConfigured && (
@@ -1307,6 +1320,9 @@ export default function App() {
         </nav>
 
         <div className="pt-4 border-t border-slate-800 space-y-3">
+          <div className="px-2 py-1 text-[8px] font-mono text-slate-600">
+            Firebase Status: {isFirebaseConfigured ? 'ON' : 'OFF'}
+          </div>
           {isFirebaseConfigured ? (
             user ? (
               <div className="space-y-2 px-1 text-left">
@@ -1345,7 +1361,7 @@ export default function App() {
             </div>
           )}
           
-          <p className="text-[10px] text-slate-500 font-mono text-center">v4.0 • Tarifa PVPC 2.0TD</p>
+          <p className="text-[10px] text-slate-500 font-mono text-center">v4.1 • Tarifa PVPC 2.0TD</p>
         </div>
       </aside>
 
@@ -1527,17 +1543,33 @@ export default function App() {
                       <select 
                         value={ieeSelection}
                         onChange={e => {
-                          const val = e.target.value as 'standard' | 'custom';
+                          const val = e.target.value as 'standard' | 'mincomunitario' | 'custom';
                           setIeeSelection(val);
                           if (val === 'standard') {
-                            setBillData(p => ({...p, iee: 5.11269632}));
+                            setBillData(p => ({...p, iee: 5.11269632, ieeMinComunitario: 0}));
+                          } else if (val === 'mincomunitario') {
+                            setBillData(p => ({...p, ieeMinComunitario: 0.001, iee: 0}));
+                          } else {
+                            setBillData(p => ({...p, ieeMinComunitario: 0}));
                           }
                         }}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer mb-1.5"
                       >
-                        <option value="standard">5,11269632%</option>
-                        <option value="custom">Personalizado</option>
+                        <option value="standard">5,11269632% (Estándar)</option>
+                        <option value="mincomunitario">Mínimo comunitario (€/kWh)</option>
+                        <option value="custom">Personalizado (%)</option>
                       </select>
+                      {/* Mínimo comunitario: input €/kWh */}
+                      <input 
+                        type="number" min="0" max="1" step="0.0001"
+                        value={billData.ieeMinComunitario ?? 0.001}
+                        onChange={e => setBillData(p => ({...p, ieeMinComunitario: parseFloat(e.target.value) || 0}))}
+                        className={`w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono ${
+                          ieeSelection === 'mincomunitario' ? 'block animate-in slide-in-from-top-1 duration-150' : 'hidden'
+                        }`}
+                        placeholder="0.001 €/kWh"
+                      />
+                      {/* Personalizado: input % */}
                       <input 
                         type="number" aria-invalid={hasError("iee")} aria-describedby="billing-error-iee" min="0" max="100" step="0.01"
                         value={billData.iee} 
@@ -1889,29 +1921,46 @@ export default function App() {
                         <span className="font-mono text-white">{results.totalVariable.toFixed(2)} €</span>
                       </div>
 
-                      <div className="pl-3 border-l border-dashed border-slate-800 text-[11px] text-slate-400 space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span>• Punta (P1):</span>
-                          <span className="font-mono font-medium text-slate-300">{billData.kwhPunta} kWh ({billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 ? ((billData.kwhPunta / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) : "0.0"}%) — <span className="text-white font-semibold">{((billData.kwhPunta * billData.precioKwhPunta) + (billData.kwhPunta * (billData.costeEnergiaPunta ?? billData.costeEnergiaVariable))).toFixed(2)} €</span></span>
+                      {/* --- Peajes de Acceso desglosados --- */}
+                      <div className="pl-3 border-l border-dashed border-slate-700 text-[11px] space-y-0.5">
+                        <div className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Peajes de Acceso</div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Punta (P1): {billData.kwhPunta} kWh × {billData.precioKwhPunta.toFixed(6)}</span>
+                          <span className="font-mono">{results.peajesPunta.toFixed(2)} €</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span>• Llano (P2):</span>
-                          <span className="font-mono font-medium text-slate-300">{billData.kwhLlano} kWh ({billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 ? ((billData.kwhLlano / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) : "0.0"}%) — <span className="text-white font-semibold">{((billData.kwhLlano * billData.precioKwhLlano) + (billData.kwhLlano * (billData.costeEnergiaLlano ?? billData.costeEnergiaVariable))).toFixed(2)} €</span></span>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Llano (P2): {billData.kwhLlano} kWh × {billData.precioKwhLlano.toFixed(6)}</span>
+                          <span className="font-mono">{results.peajesLlano.toFixed(2)} €</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span>• Valle (P3):</span>
-                          <span className="font-mono font-medium text-slate-300">{billData.kwhValle} kWh ({billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 ? ((billData.kwhValle / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) : "0.0"}%) — <span className="text-white font-semibold">{((billData.kwhValle * billData.precioKwhValle) + (billData.kwhValle * (billData.costeEnergiaValle ?? billData.costeEnergiaVariable))).toFixed(2)} €</span></span>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Valle (P3): {billData.kwhValle} kWh × {billData.precioKwhValle.toFixed(6)}</span>
+                          <span className="font-mono">{results.peajesValle.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-500 border-t border-slate-800 pt-0.5 mt-0.5">
+                          <span className="italic">Total peajes</span>
+                          <span className="font-mono">{results.totalPeajes.toFixed(2)} €</span>
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center text-slate-300 pl-3 border-l-2 border-slate-800 text-xs">
-                        <span className="text-slate-400">Peajes de Acceso (Variable)</span>
-                        <span className="font-mono">{results.totalPeajes.toFixed(2)} €</span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-slate-300 pl-3 border-l-2 border-slate-800 text-xs">
-                        <span className="text-slate-400">Coste de la Energía (OMIE)</span>
-                        <span className="font-mono">{results.totalEnergia.toFixed(2)} €</span>
+                      {/* --- Coste Energía desglosado --- */}
+                      <div className="pl-3 border-l border-dashed border-amber-900/50 text-[11px] space-y-0.5">
+                        <div className="text-amber-600/80 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Coste de la Energía (OMIE)</div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Punta (P1): {billData.kwhPunta} kWh × {(billData.costeEnergiaPunta ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span className="font-mono">{results.energiaPunta.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Llano (P2): {billData.kwhLlano} kWh × {(billData.costeEnergiaLlano ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span className="font-mono">{results.energiaLlano.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>• Valle (P3): {billData.kwhValle} kWh × {(billData.costeEnergiaValle ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span className="font-mono">{results.energiaValle.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-500 border-t border-slate-800 pt-0.5 mt-0.5">
+                          <span className="italic">Total energía</span>
+                          <span className="font-mono">{results.totalEnergia.toFixed(2)} €</span>
+                        </div>
                       </div>
 
                       <div className="flex justify-between items-center text-slate-300">

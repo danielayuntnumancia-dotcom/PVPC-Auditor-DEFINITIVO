@@ -31,7 +31,8 @@ export interface BillData {
   bonoSocial: number; // € fijo periodo
   
   // Impuestos
-  iee: number; // % Impuesto Eléctrico
+  iee: number; // % Impuesto Eléctrico (modo porcentaje)
+  ieeMinComunitario?: number; // €/kWh tarifa mínimo comunitario (si se usa este modo)
   iva: number; // % IVA (10 o 21)
 }
 
@@ -39,8 +40,17 @@ export interface BillResults {
   dias: number;
   totalFijo: number;
   totalVariable: number;
+  // Peajes desglosados por periodo
   totalPeajes: number;
+  peajesPunta: number;
+  peajesLlano: number;
+  peajesValle: number;
+  // Coste energía desglosado por periodo
   totalEnergia: number;
+  energiaPunta: number;
+  energiaLlano: number;
+  energiaValle: number;
+  // Resto
   totalIee: number;
   totalRegulados: number;
   totalIva: number;

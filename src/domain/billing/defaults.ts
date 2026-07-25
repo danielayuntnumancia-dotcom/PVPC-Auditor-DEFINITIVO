@@ -23,5 +23,6 @@ export const DEFAULT_PVPC_VALUES: BillData = {
   alqContador: 0.02663,
   bonoSocial: 0.6,
   iee: 5.11269632,
+  ieeMinComunitario: 0, // 0 = usa modo porcentaje; > 0 = activa mínimo comunitario (€/kWh)
   iva: 21,
 };
