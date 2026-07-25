@@ -1914,15 +1914,15 @@ export default function App() {
                       <div className="pl-3 border-l border-dashed border-slate-700 text-[11px] space-y-0.5">
                         <div className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Peajes de Potencia y Margen</div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• P1 (Punta): {billData.kwPunta} kW × {billData.precioKwPunta.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span>• P1 (Punta)</span>
                           <span className="font-mono">{results.fijoPunta.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• P2 (Valle): {billData.kwValle} kW × {billData.precioKwValle.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span>• P2 (Valle)</span>
                           <span className="font-mono">{results.fijoValle.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Margen comercialización: {billData.kwPunta} kW × {billData.precioMargen.toFixed(6)} €/kW/año × ({results.dias}/365) días</span>
+                          <span>• Margen comercialización</span>
                           <span className="font-mono">{results.fijoMargen.toFixed(2)} €</span>
                         </div>
                       </div>
@@ -1936,15 +1936,15 @@ export default function App() {
                       <div className="pl-3 border-l border-dashed border-slate-700 text-[11px] space-y-0.5">
                         <div className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Peajes de Acceso</div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Punta (P1): {billData.kwhPunta} kWh × {billData.precioKwhPunta.toFixed(6)}</span>
+                          <span>• Punta (P1)</span>
                           <span className="font-mono">{results.peajesPunta.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Llano (P2): {billData.kwhLlano} kWh × {billData.precioKwhLlano.toFixed(6)}</span>
+                          <span>• Llano (P2)</span>
                           <span className="font-mono">{results.peajesLlano.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Valle (P3): {billData.kwhValle} kWh × {billData.precioKwhValle.toFixed(6)}</span>
+                          <span>• Valle (P3)</span>
                           <span className="font-mono">{results.peajesValle.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-500 border-t border-slate-800 pt-0.5 mt-0.5">
@@ -1957,15 +1957,15 @@ export default function App() {
                       <div className="pl-3 border-l border-dashed border-amber-900/50 text-[11px] space-y-0.5">
                         <div className="text-amber-600/80 font-semibold uppercase tracking-wider text-[10px] pb-0.5">Coste de la Energía (OMIE)</div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Punta (P1): {billData.kwhPunta} kWh × {(billData.costeEnergiaPunta ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span>• Punta (P1)</span>
                           <span className="font-mono">{results.energiaPunta.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Llano (P2): {billData.kwhLlano} kWh × {(billData.costeEnergiaLlano ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span>• Llano (P2)</span>
                           <span className="font-mono">{results.energiaLlano.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-400">
-                          <span>• Valle (P3): {billData.kwhValle} kWh × {(billData.costeEnergiaValle ?? billData.costeEnergiaVariable).toFixed(6)}</span>
+                          <span>• Valle (P3)</span>
                           <span className="font-mono">{results.energiaValle.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-500 border-t border-slate-800 pt-0.5 mt-0.5">
@@ -1973,6 +1973,7 @@ export default function App() {
                           <span className="font-mono">{results.totalEnergia.toFixed(2)} €</span>
                         </div>
                       </div>
+
 
                       <div className="flex justify-between items-center text-slate-300">
                         <span>Imp. Eléctrico (IEE)</span>
