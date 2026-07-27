@@ -112,6 +112,8 @@ export function calcularFactura(data: BillData): BillResults {
   const outEnergiaValle = costeEnergiaValleTotal.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalEnergia = costeEnergia.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalIee = totalIee.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outTotalBonoSocial = dBonoSocial.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
+  const outTotalAlquiler = dAlqContador.mul(dDias).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalRegulados = totalRegulados.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalIva = totalIva.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber();
   const outTotalFactura = totalFactura.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
@@ -134,6 +136,8 @@ export function calcularFactura(data: BillData): BillResults {
     energiaLlano: outEnergiaLlano,
     energiaValle: outEnergiaValle,
     totalIee: outTotalIee,
+    totalBonoSocial: outTotalBonoSocial,
+    totalAlquiler: outTotalAlquiler,
     totalRegulados: outTotalRegulados,
     totalIva: outTotalIva,
     totalFactura: outTotalFactura,

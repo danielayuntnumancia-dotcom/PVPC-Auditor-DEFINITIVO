@@ -16,15 +16,15 @@ if (endIndex === -1) {
 let apiLogic = serverTs.substring(0, endIndex);
 
 // Replace Vite import which is not needed
-apiLogic = apiLogic.replace(/import { createServer as createViteServer } from "vite";\n/, '');
+apiLogic = apiLogic.replace(/import { createServer as createViteServer } from "vite";\r?\n/, '');
 
 // Add Firebase imports at the top
 const firebaseImports = `import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import { initializeApp } from "firebase-admin/app";
 import cors from "cors";
 
 // Initialize Firebase Admin
-admin.initializeApp();
+initializeApp();
 `;
 
 // Replace 'const app = express();' with cors configuration

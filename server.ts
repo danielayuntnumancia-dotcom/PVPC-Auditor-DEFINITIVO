@@ -362,7 +362,7 @@ Si los datos de ese período exacto no están disponibles porque el período est
 Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurada en el JSON.`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-3.6-flash",
           contents: prompt,
           config: {
             tools: [{ googleSearch: {} }],
@@ -755,7 +755,7 @@ Reglas:
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash", // Use gemini-1.5-flash for faster and reliable free-tier multi-modal analysis
+        model: "gemini-3.6-flash", // Use gemini-3.6-flash for faster and reliable free-tier multi-modal analysis
         contents: [imagePart, promptPart],
         config: {
           responseMimeType: "application/json",
@@ -790,10 +790,10 @@ Reglas:
       });
       responseText = response.text?.trim() || "";
     } catch (primaryError: any) {
-      console.warn("[PVPC Auditor] Error con gemini-1.5-flash al escanear, reintentando con gemini-1.5-flash:", primaryError);
+      console.warn("[PVPC Auditor] Error con gemini-3.6-flash al escanear, reintentando con gemini-3.6-flash:", primaryError);
       try {
         const fallbackResponse = await ai.models.generateContent({
-          model: "gemini-1.5-flash", // Fallback lightweight model
+          model: "gemini-3.6-flash", // Fallback lightweight model
           contents: [imagePart, promptPart],
           config: {
             responseMimeType: "application/json",
@@ -910,7 +910,7 @@ app.post("/api/gemini/chat", async (req, res) => {
   try {
     const { message, history, mode, billData, marketAnalysis, image, mimeType, sources, historyEntries } = req.body;
 
-    let modelName = "gemini-1.5-flash";
+    let modelName = "gemini-3.6-flash";
     const config: any = {};
 
     // Expert Spanish Energy Auditor System Instructions
@@ -1037,18 +1037,18 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
 
     // Apply configuration based on mode
     if (mode === "fast") {
-      modelName = "gemini-1.5-flash"; // Low-latency
+      modelName = "gemini-3.6-flash"; // Low-latency
     } else if (mode === "thinking") {
-      modelName = "gemini-1.5-flash"; // High thinking without free tier quota limitations
+      modelName = "gemini-3.6-flash"; // High thinking without free tier quota limitations
       config.thinkingConfig = {
         thinkingLevel: ThinkingLevel.HIGH,
       };
       // Do not set maxOutputTokens for thinking mode per guidelines
     } else if (mode === "grounded") {
-      modelName = "gemini-1.5-flash"; // Google Search grounded
+      modelName = "gemini-3.6-flash"; // Google Search grounded
       config.tools = [{ googleSearch: {} }];
     } else {
-      modelName = "gemini-1.5-flash"; // Normal
+      modelName = "gemini-3.6-flash"; // Normal
     }
 
     // Convert history for the @google/genai SDK format ensuring perfectly alternating roles
@@ -1110,7 +1110,7 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
         config,
       });
     } catch (apiError: any) {
-      console.warn("Error calling Gemini with standard/grounded configuration, retrying with lighter fallback model (gemini-1.5-flash):", apiError);
+      console.warn("Error calling Gemini with standard/grounded configuration, retrying with lighter fallback model (gemini-3.6-flash):", apiError);
       fallbackUsed = true;
       try {
         const fallbackConfig = { ...config };
@@ -1118,19 +1118,19 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
         delete fallbackConfig.thinkingConfig;
         
         response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-3.6-flash",
           contents,
           config: fallbackConfig,
         });
       } catch (liteError: any) {
-        console.warn("Error with gemini-1.5-flash, trying gemini-1.5-flash fallback:", liteError);
+        console.warn("Error with gemini-3.6-flash, trying gemini-3.6-flash fallback:", liteError);
         try {
           const fallbackConfig = { ...config };
           delete fallbackConfig.tools;
           delete fallbackConfig.thinkingConfig;
           
           response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.6-flash",
             contents,
             config: fallbackConfig,
           });

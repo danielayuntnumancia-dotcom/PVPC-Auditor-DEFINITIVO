@@ -57,6 +57,8 @@ export interface BillResults {
   // Resto
   totalIee: number;
   totalRegulados: number;
+  totalBonoSocial: number;
+  totalAlquiler: number;
   totalIva: number;
   totalFactura: number;
   alertaPresupuesto: boolean;

@@ -18,6 +18,8 @@ export default function BillChart({ results }: BillChartProps) {
     totalPeajes: 0,
     totalEnergia: 0,
     totalIee: 0,
+    totalBonoSocial: 0,
+    totalAlquiler: 0,
     totalRegulados: 0,
     totalIva: 0,
     totalFactura: 0,
@@ -29,7 +31,8 @@ export default function BillChart({ results }: BillChartProps) {
     { name: "Peajes de Acceso (Variable)", value: safe.totalPeajes ?? 0, color: "#3b82f6" },
     { name: "Coste de la Energía", value: safe.totalEnergia ?? 0, color: "#06b6d4" },
     { name: "Imp. Eléctrico (IEE)", value: safe.totalIee ?? 0, color: "#f59e0b" },
-    { name: "Regulados y Contador", value: safe.totalRegulados ?? 0, color: "#6366f1" },
+    { name: "Alquiler de Contador", value: safe.totalAlquiler ?? 0, color: "#6366f1" },
+    { name: "Bono Social", value: safe.totalBonoSocial ?? 0, color: "#8b5cf6" },
     { name: "IVA", value: safe.totalIva ?? 0, color: "#f43f5e" },
   ].filter((item) => item.value > 0);
 

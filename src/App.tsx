@@ -307,6 +307,14 @@ export default function App() {
     }
   }, [billData.iee, billData.ieeMinComunitario]);
 
+  const [alqContadorSelection, setAlqContadorSelection] = useState<'auto' | 'custom'>(() => {
+    return Math.abs(billData.alqContador - 0.026667) < 0.000001 ? 'auto' : 'custom';
+  });
+
+  useEffect(() => {
+    setAlqContadorSelection(Math.abs(billData.alqContador - 0.026667) < 0.000001 ? 'auto' : 'custom');
+  }, [billData.alqContador]);
+
   const [editIeeSelection, setEditIeeSelection] = useState<'standard' | 'mincomunitario' | 'custom'>('standard');
 
   useEffect(() => {
@@ -936,9 +944,12 @@ export default function App() {
       role: 'user',
       content: currentInput || 'Te he adjuntado una imagen para analizar.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      sourceFileId: activeSourceId,
-      imageUrl: currentImgBase64 ? `data:${currentImgMimeType};base64,${currentImgBase64}` : undefined
+      sourceFileId: activeSourceId || null
     };
+
+    if (currentImgBase64) {
+      userMsg.imageUrl = `data:${currentImgMimeType};base64,${currentImgBase64}`;
+    }
 
     setChats(prev => [...prev, userMsg]);
     if (user && db) {
@@ -1006,7 +1017,7 @@ export default function App() {
         content: data.text,
         citations: data.citations,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sourceFileId: activeSourceId
+        sourceFileId: activeSourceId || null
       };
 
       setChats(prev => [...prev, aiMsg]);
@@ -1023,7 +1034,7 @@ export default function App() {
         role: 'assistant',
         content: `⚠️ Error de comunicación: ${msg}. Inténtalo de nuevo por favor.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sourceFileId: activeSourceId
+        sourceFileId: activeSourceId || null
       };
 
       setChats(prev => [...prev, errMsg]);
@@ -1510,7 +1521,7 @@ export default function App() {
                 {/* Bloque Periodo e Impuestos */}
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-sm">
                   <h3 className="text-sm font-semibold tracking-wider text-slate-400 uppercase border-b border-slate-800 pb-2">Control de Periodo e Impuestos</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-400 mb-1">F. Inicio</label>
                       <CustomDatePicker 
@@ -1581,15 +1592,42 @@ export default function App() {
                       />
 {hasError("iee") && <div id="billing-error-iee" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "iee")?.message}</div>}
                     </div>
+
                     <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Alerta Límite (€)</label>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Alq. Cont. (€/día)</label>
+                      <select
+                        value={alqContadorSelection}
+                        onChange={e => {
+                          const val = e.target.value as 'auto' | 'custom';
+                          setAlqContadorSelection(val);
+                          if (val === 'auto') {
+                            setBillData(p => ({...p, alqContador: 0.026667}));
+                          }
+                        }}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer mb-1.5"
+                      >
+                        <option value="auto">Automático (0,026667)</option>
+                        <option value="custom">Personalizado</option>
+                      </select>
                       <input 
-                        type="number" aria-invalid={hasError("presupuesto")} aria-describedby="billing-error-presupuesto" min="0" max="99999" step="0.01" 
-                        value={billData.presupuesto} 
-                        onChange={e => setBillData(p => ({...p, presupuesto: Number(e.target.value)}))}
+                        type="number" aria-invalid={hasError("alqContador")} aria-describedby="billing-error-alqContador" min="0" max="5" step="0.000001" 
+                        value={billData.alqContador} 
+                        onChange={e => setBillData(p => ({...p, alqContador: Number(e.target.value)}))}
+                        className={`w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono ${
+                          alqContadorSelection === 'custom' ? 'block animate-in slide-in-from-top-1 duration-150' : 'hidden'
+                        }`}
+                      />
+{hasError("alqContador") && <div id="billing-error-alqContador" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "alqContador")?.message}</div>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Bono Social (€)</label>
+                      <input 
+                        type="number" aria-invalid={hasError("bonoSocial")} aria-describedby="billing-error-bonoSocial" min="-50" max="50" step="0.01" 
+                        value={billData.bonoSocial} 
+                        onChange={e => setBillData(p => ({...p, bonoSocial: Number(e.target.value)}))}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                       />
-{hasError("presupuesto") && <div id="billing-error-presupuesto" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "presupuesto")?.message}</div>}
+{hasError("bonoSocial") && <div id="billing-error-bonoSocial" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "bonoSocial")?.message}</div>}
                     </div>
                   </div>
 
@@ -1981,8 +2019,13 @@ export default function App() {
                       </div>
 
                       <div className="flex justify-between items-center text-slate-300">
-                        <span>Regulados y Contador</span>
-                        <span className="font-mono text-white">{results.totalRegulados.toFixed(2)} €</span>
+                        <span>Alquiler de Contador</span>
+                        <span className="font-mono text-white">{results.totalAlquiler.toFixed(2)} €</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-slate-300">
+                        <span>Bono Social</span>
+                        <span className="font-mono text-white">{results.totalBonoSocial.toFixed(2)} €</span>
                       </div>
 
                       <div className="flex justify-between items-center text-slate-400 border-t border-slate-800 pt-3">
@@ -2853,199 +2896,14 @@ export default function App() {
                       </div>
 
                       {/* Botón de Analizar Mercado */}
-                      <div className="mt-6 border-t border-slate-900 pt-6">
-                        {!isAnalyzingMarket && !marketAnalysis && !marketAnalysisError && (
-                          <button
-                            type="button"
-                            onClick={() => handleAnalyzeMarket(avgPunta, avgLlano, avgValle, avgKwPunta, avgKwValle, avgDias)}
-                            className="w-full py-4 px-6 bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 cursor-pointer"
-                          >
-                            <Bot className="w-5 h-5" />
-                            <span>Analizar Mercado Actual con IA</span>
-                          </button>
-                        )}
-
-                        {isAnalyzingMarket && (
-                          <div className="bg-slate-950/85 p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
-                            <div className="relative flex items-center justify-center">
-                              <div className="w-12 h-12 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin"></div>
-                              <Bot className="absolute w-5 h-5 text-amber-400 animate-bounce" />
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-bold text-white">Analizando Mercado de Tarifas...</h4>
-                              <p className="text-xs text-slate-400 max-w-sm">
-                                Consultando precios reales en tiempo real vía Google Search Grounding y simulando tu perfil de {avgTotalKwh.toFixed(1)} kWh/mes.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {marketAnalysisError && (
-                          <div className="bg-slate-950 p-6 rounded-2xl border border-rose-950 text-center space-y-4">
-                            <div className="mx-auto w-12 h-12 bg-rose-950/50 rounded-full border border-rose-950 flex items-center justify-center text-rose-400">
-                              <AlertTriangle className="w-6 h-6" />
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-bold text-white">No se pudo completar el análisis</h4>
-                              <p className="text-xs text-slate-400">{marketAnalysisError}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleAnalyzeMarket(avgPunta, avgLlano, avgValle, avgKwPunta, avgKwValle, avgDias)}
-                              className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer"
-                            >
-                              Reintentar Análisis
-                            </button>
-                          </div>
-                        )}
-
-                        {marketAnalysis && (
-                          <div className="space-y-6 animate-in fade-in duration-300">
-                            
-                            {/* Banner de Tarifa recomendada y ahorro */}
-                            <div className="bg-gradient-to-r from-emerald-950/60 to-slate-950 border border-emerald-500/20 p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                              <div className="space-y-1 text-left">
-                                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-bold block">RECOMENDACIÓN GANADORA</span>
-                                <h4 className="text-base font-black text-white">
-                                  {marketAnalysis.cheapestTariffName}
-                                </h4>
-                                <p className="text-xs text-slate-400">
-                                  Es la opción óptima para tu consumo de {avgTotalKwh.toFixed(1)} kWh/mes y potencia de {avgKwPunta.toFixed(1)} kW.
-                                </p>
-                              </div>
-                              <div className="bg-emerald-950/40 border border-emerald-500/20 px-5 py-3 rounded-xl text-center self-start sm:self-auto shrink-0">
-                                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-semibold">Ahorro Anual Estimado</span>
-                                <span className="text-2xl font-black text-emerald-400 font-mono">
-                                  ~{marketAnalysis.estimatedAnnualSavings.toFixed(0)}€
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Grid de Ofertas Comparadas */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                              {marketAnalysis.offers.map((offer, index) => {
-                                const isCheapest = offer.name.toLowerCase().includes(marketAnalysis.cheapestTariffName.toLowerCase()) || 
-                                                   marketAnalysis.cheapestTariffName.toLowerCase().includes(offer.name.toLowerCase());
-                                return (
-                                  <div 
-                                    key={index}
-                                    className={`relative p-5 rounded-2xl border flex flex-col justify-between transition-all duration-200 bg-slate-950/40 ${
-                                      isCheapest 
-                                        ? 'border-emerald-500/40 shadow-md shadow-emerald-950/10' 
-                                        : 'border-slate-800'
-                                    }`}
-                                  >
-                                    {isCheapest && (
-                                      <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                                        Más Barata
-                                      </span>
-                                    )}
-
-                                    <div className="space-y-3">
-                                      <div>
-                                        <span className="text-[9px] uppercase font-mono tracking-wider text-slate-500 font-bold block">{offer.company}</span>
-                                        <h5 className="font-bold text-sm text-white">{offer.name}</h5>
-                                      </div>
-
-                                      <div className="flex items-baseline gap-1 bg-slate-900/60 p-3 rounded-xl border border-slate-900">
-                                        <span className="text-2xl font-black text-white font-mono">{offer.estimatedMonthlyCost.toFixed(2)}€</span>
-                                        <span className="text-[10px] text-slate-500 font-mono">/mes estim.</span>
-                                      </div>
-
-                                      <div className="text-[11px] space-y-1.5 pt-1">
-                                        <div className="flex justify-between border-b border-slate-900/60 pb-1 gap-2">
-                                          <span className="text-slate-500 font-medium shrink-0">Precios energía:</span>
-                                          <span className="text-slate-300 font-mono text-right truncate">{offer.energyPriceDetails}</span>
-                                        </div>
-                                        <div className="flex justify-between border-b border-slate-900/60 pb-1 gap-2">
-                                          <span className="text-slate-500 font-medium shrink-0">Precios potencia:</span>
-                                          <span className="text-slate-300 font-mono text-right truncate">{offer.powerPriceDetails}</span>
-                                        </div>
-                                      </div>
-
-                                      {/* Pros & Contras */}
-                                      <div className="space-y-2 pt-2 text-[11px]">
-                                        <div className="space-y-1">
-                                          {offer.pros.map((pro, pIdx) => (
-                                            <div key={pIdx} className="flex items-start gap-1.5 text-emerald-400">
-                                              <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                              <span className="text-slate-300 leading-tight">{pro}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div className="space-y-1">
-                                          {offer.cons.map((con, cIdx) => (
-                                            <div key={cIdx} className="flex items-start gap-1.5 text-rose-400/80">
-                                              <X className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                              <span className="text-slate-400 leading-tight">{con}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="pt-4 mt-4 border-t border-slate-900 flex justify-between items-center text-xs">
-                                      <span className="capitalize text-slate-500 bg-slate-900 px-2 py-0.5 rounded text-[10px] font-semibold border border-slate-900">
-                                        {offer.type.replace('_', ' ')}
-                                      </span>
-                                      <a 
-                                        href={offer.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <span>Visitar web</span>
-                                        <ChevronRight className="w-3 h-3" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Análisis IA Detallado */}
-                            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 text-left">
-                              <div className="flex items-center gap-2 border-b border-slate-900 pb-3">
-                                <Bot className="text-amber-400 w-5 h-5" />
-                                <h5 className="font-bold text-sm text-white">Informe Técnico de Suministro (Asesor IA)</h5>
-                              </div>
-                              <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed font-sans">
-                                {marketAnalysis.recommendations}
-                              </p>
-                            </div>
-
-                            {/* Citas y Fuentes de Información */}
-                            {marketAnalysis.citations && marketAnalysis.citations.length > 0 && (
-                              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-900 text-[11px] space-y-2 text-left">
-                                <span className="text-slate-500 font-bold uppercase tracking-wider font-mono text-[9px] block">Fuentes consultadas en tiempo real:</span>
-                                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                                  {marketAnalysis.citations.map((cite, cIdx) => (
-                                    <a 
-                                      key={cIdx} 
-                                      href={cite.url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-indigo-400 hover:text-indigo-300 hover:underline transition truncate max-w-xs"
-                                      title={cite.title}
-                                    >
-                                      🔗 {cite.title || cite.url}
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Botón para resetear */}
-                            <button
-                              type="button"
-                              onClick={() => setMarketAnalysis(null)}
-                              className="w-full py-3 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl transition cursor-pointer"
-                            >
-                              Volver a comparar o actualizar datos
-                            </button>
-
-                          </div>
-                        )}
+                      <div className="mt-6 border-t border-slate-900 pt-6 text-center">
+                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col items-center gap-2">
+                          <Scale className="w-6 h-6 text-slate-500" />
+                          <h4 className="text-sm font-bold text-slate-300">Buscador de Ofertas Deshabilitado</h4>
+                          <p className="text-xs text-slate-500 max-w-sm">
+                            El sistema de búsqueda en tiempo real mediante IA está temporalmente desactivado para evitar mostrar enlaces rotos o precios desactualizados del mercado.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
