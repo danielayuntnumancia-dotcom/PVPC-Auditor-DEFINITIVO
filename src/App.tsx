@@ -2563,7 +2563,7 @@ export default function App() {
               const costeP3Energy = bData.kwhValle * (bData.costeEnergiaValle ?? bData.costeEnergiaVariable);
 
               return (
-                <div className="p-4 md:p-8 space-y-6 max-w-5xl w-full mr-auto pb-12">
+                <div className="p-4 md:p-8 space-y-6 max-w-[1600px] w-full mx-auto pb-12">
                   
                   {/* Selector de día elegante y compacto en cabecera */}
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
@@ -2843,7 +2843,7 @@ export default function App() {
 
         {/* SECCIÓN 4: COMPARADOR DE TARIFAS */}
         {activeSection === 'comparador' && (
-          <div className="flex-1 flex flex-col overflow-y-auto bg-slate-900/50 animate-in fade-in duration-200 p-4 md:p-8 max-w-5xl w-full mr-auto pb-12 space-y-6">
+          <div className="flex-1 flex flex-col overflow-y-auto bg-slate-900/50 animate-in fade-in duration-200 p-4 md:p-8 max-w-[1600px] w-full mx-auto pb-12 space-y-6">
             {(() => {
               const officialBills = history.filter(item => item.tipo === 'oficial');
               const hasOfficial = officialBills.length > 0;
