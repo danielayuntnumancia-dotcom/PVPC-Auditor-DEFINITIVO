@@ -1518,7 +1518,7 @@ export default function App() {
         
         {/* SECCIÓN 1: CALCULADORA */}
         {activeSection === 'calculadora' && (
-          <div className="p-4 md:p-8 max-w-7xl w-full mr-auto space-y-6 animate-in fade-in duration-200">
+          <div className="p-4 md:p-8 max-w-[1600px] w-full mx-auto space-y-6 animate-in fade-in duration-200">
             
             {/* Cabecera Interna */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-md">
