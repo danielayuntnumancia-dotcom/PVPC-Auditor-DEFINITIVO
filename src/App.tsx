@@ -27,7 +27,7 @@ import {
   Image
 } from 'lucide-react';
 import { BillData, BillResults, SourceFile, ChatMessage, HistoryEntry, MarketAnalysisData, MarketOffer } from './types';
-import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone } from './utils';
+import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile } from './utils';
 import BillChart from './components/BillChart';
 import ComparisonChart from './components/ComparisonChart';
 import CustomDatePicker from './components/CustomDatePicker';
@@ -224,6 +224,10 @@ export default function App() {
   const [editTipo, setEditTipo] = useState<'simulacion' | 'oficial'>('simulacion');
   const [editMesFacturacion, setEditMesFacturacion] = useState<string>('');
   const [editBillData, setEditBillData] = useState<BillData | null>(null);
+
+  // Backup and Export State
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>([]);
 
   const handleEditHistoryInit = (entry: HistoryEntry) => {
     setEditingEntryId(entry.id);
@@ -625,6 +629,93 @@ export default function App() {
       setSaveOfficialSuccess(false);
     }, 2000);
   };
+
+  const exportFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportJSON = () => {
+    const exportData = history.filter(h => selectedExportIds.includes(h.id));
+    if (exportData.length === 0) return;
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    downloadFile(jsonStr, `backup_pvpc_${Date.now()}.json`, 'application/json');
+    setShowExportModal(false);
+  };
+
+  const handleExportCSV = () => {
+    const exportData = history.filter(h => selectedExportIds.includes(h.id));
+    if (exportData.length === 0) return;
+    
+    // Create CSV header
+    const headers = [
+      "ID", "Fecha", "Tipo", "Mes Facturacion", 
+      "Total Factura (€)", "Total Energia (€)", "Total Peajes (€)", 
+      "Total Impuestos (€)", "Base Imponible (€)", "IVA (€)"
+    ];
+    
+    // Map data
+    const rows = exportData.map(entry => {
+      return [
+        entry.id,
+        entry.dateStr,
+        entry.tipo,
+        entry.mesFacturacion || '-',
+        entry.results.totalFactura.toFixed(2),
+        entry.results.totalEnergia.toFixed(2),
+        entry.results.totalPeajes.toFixed(2),
+        (entry.results.totalIee + entry.results.totalAlquiler + entry.results.totalBonoSocial).toFixed(2),
+        (entry.results.totalFijo + entry.results.totalVariable + entry.results.totalIee + entry.results.totalAlquiler + entry.results.totalBonoSocial).toFixed(2),
+        entry.results.totalIva.toFixed(2)
+      ].join(",");
+    });
+    
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    downloadFile(csvContent, `export_pvpc_${Date.now()}.csv`, 'text/csv');
+    setShowExportModal(false);
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const importedData = JSON.parse(content) as HistoryEntry[];
+        
+        if (!Array.isArray(importedData)) throw new Error("Formato inválido");
+        
+        setHistory(prev => {
+          const newHistory = [...prev];
+          let importedCount = 0;
+          importedData.forEach(item => {
+            if (!newHistory.find(h => h.id === item.id)) {
+              newHistory.push(item);
+              importedCount++;
+            }
+          });
+          
+          if (user && db) {
+            importedData.forEach(item => {
+              setDoc(doc(db, 'users', user.uid, 'history', item.id), item)
+                .catch(err => console.error("Error syncing imported item to Firestore", err));
+            });
+          }
+          
+          return newHistory.sort((a, b) => b.timestamp - a.timestamp);
+        });
+        
+        triggerAlert("Backup importado correctamente.");
+      } catch (err) {
+        triggerAlert("Error al leer el archivo de backup. Asegúrate de que sea un .json válido.");
+      }
+      
+      if (exportFileInputRef.current) {
+        exportFileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
+  };
+
 
   const handleRestoreHistory = (entry: HistoryEntry) => {
     triggerConfirm(
@@ -2438,12 +2529,27 @@ export default function App() {
                     <p className="text-xs text-slate-400 max-w-xs mt-1">
                       Aún no tienes ningún registro diario guardado para auditar la evolución de tus consumos.
                     </p>
-                    <button
-                      onClick={() => setActiveSection('calculadora')}
-                      className="mt-5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-900/20"
-                    >
-                      Ir al Simulador y Guardar
-                    </button>
+                    <div className="mt-5 flex items-center gap-3 justify-center">
+                      <button
+                        onClick={() => setActiveSection('calculadora')}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-900/20"
+                      >
+                        Ir al Simulador y Guardar
+                      </button>
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        ref={exportFileInputRef}
+                        onChange={handleImportJSON}
+                      />
+                      <button
+                        onClick={() => exportFileInputRef.current?.click()}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition shadow-md flex items-center gap-2"
+                      >
+                        <UploadCloud className="w-4 h-4" /> Importar Backup
+                      </button>
+                    </div>
                   </div>
                 );
               }
@@ -2465,8 +2571,28 @@ export default function App() {
                       <span className="text-[10px] uppercase font-mono tracking-widest text-indigo-400 font-bold block">Historial de Registros</span>
                       <p className="text-xs text-slate-400 mt-0.5">Selecciona un día para visualizar su desglose de auditoría.</p>
                     </div>
-                    <select
-                      value={selectedEntry.id}
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        ref={exportFileInputRef}
+                        onChange={handleImportJSON}
+                      />
+                      <button
+                        onClick={() => exportFileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/30 text-emerald-400 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" /> Importar
+                      </button>
+                      <button
+                        onClick={() => setShowExportModal(true)}
+                        className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-950/30 text-indigo-400 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Exportar / Backup
+                      </button>
+                      <select
+                        value={selectedEntry.id}
                       onChange={(e) => setSelectedHistoryEntryId(e.target.value)}
                       className="bg-slate-900 border border-slate-800 rounded-xl text-xs py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
                     >
@@ -2494,6 +2620,7 @@ export default function App() {
                       )}
                     </select>
                   </div>
+                </div>
 
                   {/* Cabecera del Registro */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-md">
@@ -3360,6 +3487,95 @@ export default function App() {
               >
                 <Check className="w-4 h-4" />
                 Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Modal de Exportación y Copia de Seguridad */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowExportModal(false)} />
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-800/80">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Save className="w-5 h-5 text-indigo-400" />
+                  Exportar / Copia de Seguridad
+                </h3>
+                <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white transition">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Selecciona las facturas y simulaciones que quieres exportar. El formato <strong className="text-indigo-400">JSON</strong> sirve para restaurar copias de seguridad. El formato <strong className="text-emerald-400">CSV</strong> sirve para abrir en Excel.
+              </p>
+              
+              <div className="flex gap-2 mt-4">
+                <button 
+                  onClick={() => setSelectedExportIds(history.map(h => h.id))}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-white rounded-lg transition"
+                >
+                  Seleccionar Todo
+                </button>
+                <button 
+                  onClick={() => setSelectedExportIds([])}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-white rounded-lg transition"
+                >
+                  Deseleccionar Todo
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto space-y-2 bg-slate-950/30">
+              {history.map(entry => (
+                <label key={entry.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${selectedExportIds.includes(entry.id) ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedExportIds.includes(entry.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedExportIds(prev => [...prev, entry.id]);
+                      } else {
+                        setSelectedExportIds(prev => prev.filter(id => id !== entry.id));
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500/30 bg-slate-800 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-bold text-slate-200">
+                        {entry.tipo === 'oficial' ? `Factura: ${entry.mesFacturacion}` : `Simulación Día: ${entry.dateStr}`}
+                      </span>
+                      <span className="text-sm font-mono text-white">{entry.results.totalFactura.toFixed(2)} €</span>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${entry.tipo === 'oficial' ? 'text-amber-400 bg-amber-500/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
+                      {entry.tipo === 'oficial' ? 'Oficial' : 'Simulación'}
+                    </span>
+                  </div>
+                </label>
+              ))}
+              {history.length === 0 && (
+                <div className="text-center text-slate-500 text-sm py-10">No hay registros en el historial para exportar.</div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-800/80 bg-slate-900 rounded-b-2xl flex flex-col sm:flex-row gap-3 justify-end">
+              <button
+                onClick={handleExportCSV}
+                disabled={selectedExportIds.length === 0}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-bold transition shadow-md flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" /> Exportar CSV (Excel)
+              </button>
+              <button
+                onClick={handleExportJSON}
+                disabled={selectedExportIds.length === 0}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-950/40 flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" /> Descargar Backup JSON
               </button>
             </div>
           </div>

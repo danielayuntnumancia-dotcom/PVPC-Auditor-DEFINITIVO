@@ -1,0 +1,1 @@
+const { execSync } = require('child_process'); try { console.log(execSync('C:\\Users\\Daniel\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\03b1cdac8af3a530\\bin\\node.exe node_modules/vite/bin/vite.js build', { encoding: 'utf-8', stdio: 'pipe' })); } catch(e) { console.error(e.stdout); console.error(e.stderr); }

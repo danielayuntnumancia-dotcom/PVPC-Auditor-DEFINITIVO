@@ -1,0 +1,1 @@
+const { execSync } = require('child_process'); try { console.log(execSync('node node_modules/vite/bin/vite.js build', { encoding: 'utf-8', stdio: 'pipe' })); } catch(e) { console.error(e.stdout); console.error(e.stderr); }
