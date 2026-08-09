@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { FileText, Upload, Sparkles, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { BillData } from "../types";
+import { getApiUrl } from "../utils";
 
 interface ScannerProps {
   onScanSuccess: (data: Partial<BillData>, explanation: string) => void;
@@ -131,7 +132,7 @@ export default function Scanner({ onScanSuccess }: ScannerProps) {
       }
 
       // API Call
-      const response = await fetch("/api/audit/scan-bill", {
+      const response = await fetch(getApiUrl("/api/audit/scan-bill"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Data, mimeType }),

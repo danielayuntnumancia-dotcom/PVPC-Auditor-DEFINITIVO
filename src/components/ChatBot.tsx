@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Sparkles, Trash2, Zap, BrainCircuit, Globe, Bot, User, ArrowRight, ExternalLink } from "lucide-react";
 import { ChatMessage, BillData, BillResults } from "../types";
 import MessageRenderer from "./MessageRenderer";
-import { safeParse } from "../utils";
+import { safeParse, getApiUrl } from "../utils";
 
 interface ChatBotProps {
   billData: BillData;
@@ -82,7 +82,7 @@ He analizado tu simulador actual y observo que tienes una factura estimada de **
       const historyEntries = safeParse<import("../types").HistoryEntry[] | null>(localStorage.getItem('pvpc_history'), []) || [];
 
       // Call Express API
-      const response = await fetch("/api/gemini/chat", {
+      const response = await fetch(getApiUrl("/api/gemini/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

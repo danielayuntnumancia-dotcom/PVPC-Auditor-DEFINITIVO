@@ -27,7 +27,7 @@ import {
   Image
 } from 'lucide-react';
 import { BillData, BillResults, SourceFile, ChatMessage, HistoryEntry, MarketAnalysisData, MarketOffer } from './types';
-import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile } from './utils';
+import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile, getApiUrl } from './utils';
 import BillChart from './components/BillChart';
 import ComparisonChart from './components/ComparisonChart';
 import CustomDatePicker from './components/CustomDatePicker';
@@ -105,7 +105,7 @@ export default function App() {
     setMarketAnalysis(null);
 
     try {
-      const response = await fetch('/api/audit/compare-market', {
+      const response = await fetch(getApiUrl('/api/audit/compare-market'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -753,7 +753,7 @@ export default function App() {
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch("/api/audit/pvpc", {
+      const response = await fetch(getApiUrl("/api/audit/pvpc"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -803,7 +803,7 @@ export default function App() {
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch("/api/audit/esios-energy-costs", {
+      const response = await fetch(getApiUrl("/api/audit/esios-energy-costs"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -853,7 +853,7 @@ export default function App() {
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch("/api/audit/pvpc-public", {
+      const response = await fetch(getApiUrl("/api/audit/pvpc-public"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -943,7 +943,7 @@ export default function App() {
       reader.readAsDataURL(file);
       const base64Data = await base64Promise;
 
-      const response = await fetch("/api/audit/scan-bill", {
+      const response = await fetch(getApiUrl("/api/audit/scan-bill"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1078,7 +1078,7 @@ export default function App() {
                           currentInput.toLowerCase().includes('http') ||
                           currentInput.toLowerCase().includes('web');
 
-      const response = await fetch("/api/gemini/chat", {
+      const response = await fetch(getApiUrl("/api/gemini/chat"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1251,18 +1251,7 @@ export default function App() {
             <Calculator className="w-5 h-5" />
             Calculadora
           </button>
-          <button
-            onClick={() => setActiveSection('ia')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-              activeSection === 'ia'
-                ? 'bg-slate-800 text-white shadow-inner border-l-4 border-indigo-500'
-                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-            }`}
-          >
-            <Bot className="w-5 h-5" />
-            Asesor IA
-          </button>
-          
+
           <button
             onClick={() => setActiveSection('comparador')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
@@ -1478,16 +1467,7 @@ export default function App() {
           <Calculator className="w-5 h-5" />
           <span className="text-[10px] font-medium">Calculadora</span>
         </button>
-        <button
-          onClick={() => setActiveSection('ia')}
-          className={`flex flex-col items-center justify-center gap-1 w-20 h-full transition ${
-            activeSection === 'ia' ? 'text-indigo-400' : 'text-slate-500'
-          }`}
-        >
-          <Bot className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Asesor IA</span>
-        </button>
-        <button
+<button
           onClick={() => setActiveSection('comparador')}
           className={`flex flex-col items-center justify-center gap-1 w-20 h-full transition ${
             activeSection === 'comparador' ? 'text-amber-400' : 'text-slate-500'
@@ -2158,359 +2138,7 @@ export default function App() {
           </div>
         )}
 
-        {/* SECCIÓN 2: ASESOR IA (SPLIT WORKSPACE ESTILO GEMINI / NOTEBOOKLM) */}
-        {activeSection === 'ia' && (
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden animate-in fade-in duration-200">
-            
-            {/* PANEL IZQUIERDO: CONTROL DE FUENTES DOCUMENTALES */}
-            {isSourcesCollapsed ? (
-              <div
-                onClick={() => setIsSourcesCollapsed(false)}
-                className="flex md:flex-col w-full md:w-10 h-11 md:h-full bg-slate-950 border-b md:border-b-0 md:border-r border-slate-800 hover:bg-slate-900/80 items-center justify-between md:justify-start py-2 px-4 md:py-6 md:px-0 gap-2 md:gap-6 cursor-pointer text-slate-400 hover:text-indigo-400 transition-all shrink-0 select-none group"
-                title="Haga clic para desplegar las Fuentes de Datos"
-              >
-                <div className="flex items-center md:flex-col gap-2 md:gap-6">
-                  <Folder className="w-5 h-5 group-hover:scale-110 transition duration-150 text-indigo-400" />
-                  <span className="text-xs font-bold tracking-wider text-slate-400 group-hover:text-indigo-300 md:hidden">
-                    Fuentes de Datos (Desplegar)
-                  </span>
-                  <div className="hidden md:flex flex-col items-center gap-1">
-                    {"FUENTES".split("").map((char, i) => (
-                      <span key={i} className="text-[10px] font-bold tracking-widest leading-none text-slate-500 group-hover:text-indigo-300">
-                        {char}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 rotate-90 md:rotate-0 md:mt-auto animate-pulse" />
-              </div>
-            ) : (
-              <div className="w-full md:w-80 bg-slate-950 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col h-1/3 md:h-full p-4 shrink-0 overflow-y-auto animate-in slide-in-from-left duration-200">
-                <div className="mb-4 flex items-center justify-between border-b border-slate-800/60 pb-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Fuentes de Datos</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Sube facturas para contextualizar el motor cognitivo.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsSourcesCollapsed(true)}
-                    className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white transition duration-150 cursor-pointer flex items-center justify-center border border-slate-800"
-                    title="Plegar Fuentes"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                </div>
-  
-                {/* Zona Uploader Drag&Drop */}
-                <label className="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center bg-slate-900/40 hover:bg-slate-900/80 group">
-                  <UploadCloud className="w-6 h-6 text-slate-500 group-hover:text-indigo-400 mb-2 transition" />
-                  <span className="text-xs font-medium text-slate-300 group-hover:text-slate-100">Subir factura (PDF/Imagen)</span>
-                  <span className="text-[10px] text-slate-500 mt-1 font-mono">Límite 50MB</span>
-                  <input type="file" onChange={handleFileUpload} className="hidden" accept="image/*,application/pdf" disabled={isUploading} />
-                </label>
-  
-                {isUploading && (
-                  <div className="mt-3 p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-3">
-                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs text-slate-400 animate-pulse">Gemini procesando OCR estructurado...</span>
-                  </div>
-                )}
-  
-                {/* Listado de Fuentes Cargadas */}
-                <div className="mt-6 space-y-2 flex-1">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest block mb-2">Documentos Activos</span>
-                  
-                  <button 
-                     onClick={() => setActiveSourceId(undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition ${
-                      activeSourceId === undefined 
-                        ? 'bg-indigo-950/60 border border-indigo-900/50 text-indigo-300' 
-                        : 'text-slate-400 hover:bg-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Bot className="w-3.5 h-3.5" />
-                      <span>Conocimiento Base Global</span>
-                    </div>
-                  </button>
-  
-                  {sources.map(src => (
-                    <div 
-                      key={src.id}
-                      className={`group w-full flex items-center justify-between rounded-lg border p-1.5 transition ${
-                        activeSourceId === src.id
-                          ? 'bg-slate-800 border-indigo-500 text-white'
-                          : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:bg-slate-950'
-                      }`}
-                    >
-                      <button 
-                        onClick={() => setActiveSourceId(src.id)}
-                        className="flex-1 text-left px-2 py-1 flex items-center gap-2 overflow-hidden"
-                      >
-                        <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                        <div className="truncate">
-                          <p className="text-xs font-medium truncate">{src.name}</p>
-                          <p className="text-[9px] text-slate-500 font-mono">{formatDate(src.parsedData.fechaInicio || '')}</p>
-                        </div>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSources(prev => prev.filter(s => s.id !== src.id));
-                          if (activeSourceId === src.id) setActiveSourceId(undefined);
-                          if (user && db) {
-                            deleteDoc(doc(db, 'users', user.uid, 'sources', src.id))
-                              .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/sources/${src.id}`));
-                          }
-                        }}
-                        className="p-1 text-slate-500 hover:text-rose-400 rounded transition opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* PANEL DERECHO: INTERFAZ DE CHAT DE PANTALLA DIVIDIDA */}
-            <div 
-              className={`flex-1 flex flex-col h-2/3 md:h-full bg-slate-900/60 relative transition-all ${
-                isDraggingChatFile ? 'ring-2 ring-indigo-500/50 bg-indigo-950/20' : ''
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDraggingChatFile(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setIsDraggingChatFile(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setIsDraggingChatFile(false);
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  const file = e.dataTransfer.files[0];
-                  handleChatFileAttachment(file);
-                }
-              }}
-            >
-              
-              {/* Drag over overlay visual hint */}
-              {isDraggingChatFile && (
-                <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xs border-2 border-dashed border-indigo-500 z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-150">
-                  <div className="p-4 bg-indigo-900/30 rounded-full mb-3 text-indigo-400 border border-indigo-500/20 animate-pulse">
-                    <UploadCloud className="w-10 h-10" />
-                  </div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Cargar en el Asesor IA</h4>
-                  <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
-                    Suelta una **imagen de oferta** para adjuntarla al chat, o un **PDF/documento de factura** para agregarlo a tus Fuentes de datos.
-                  </p>
-                </div>
-              )}
-              
-              {/* Context Indicador Superior */}
-              <div className="px-6 py-3 border-b border-slate-800/80 bg-slate-950 flex items-center justify-between">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0"></div>
-                  <span className="text-xs font-medium text-slate-300 truncate">
-                    {activeSourceId 
-                      ? `Conversando sobre: ${sources.find(s => s.id === activeSourceId)?.name}`
-                      : 'Conversando con el Asesor Global (Sin fuente vinculada)'
-                    }
-                  </span>
-                </div>
-                {chats.length > 1 && (
-                  <button 
-                    onClick={handleClearChats}
-                    className="text-[10px] font-medium text-slate-500 hover:text-slate-300 flex items-center gap-1 transition"
-                  >
-                    Limpiar Historial
-                  </button>
-                )}
-              </div>
-
-              {/* Ventana de Conversación con Scroll Independiente */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {chats
-                  .filter(msg => !msg.sourceFileId || !activeSourceId || msg.sourceFileId === activeSourceId)
-                  .map(msg => (
-                    <div 
-                      key={msg.id}
-                      className={`flex gap-3 max-w-3xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-                    >
-                      <div className={`p-2.5 rounded-xl shrink-0 h-9 w-9 flex items-center justify-center border ${
-                        msg.role === 'user' 
-                          ? 'bg-slate-800 border-slate-700 text-slate-200' 
-                          : 'bg-indigo-950 border-indigo-900 text-indigo-400'
-                      }`}>
-                        {msg.role === 'user' ? 'Tú' : <Bot className="w-4 h-4" />}
-                      </div>
-                      <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-                        msg.role === 'user'
-                          ? 'bg-indigo-600 text-white rounded-tr-none'
-                          : 'bg-slate-950 border border-slate-800/60 text-slate-200 rounded-tl-none'
-                      }`}>
-                        {msg.role === 'user' ? (
-                          <p className="whitespace-pre-line text-white">{msg.content}</p>
-                        ) : (
-                          <MessageRenderer content={msg.content} />
-                        )}
-                        
-                        {/* Render client-side uploaded image thumbnail if present in message */}
-                        {msg.imageUrl && (
-                          <div className="mt-3 max-w-xs rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
-                            <img 
-                              src={msg.imageUrl} 
-                              alt="Adjunto" 
-                              className="w-full h-auto object-cover max-h-48 cursor-pointer hover:opacity-90 transition" 
-                              onClick={() => window.open(msg.imageUrl, '_blank')}
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        )}
-
-                        {/* Citations/References rendering */}
-                        {msg.citations && msg.citations.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-slate-800/50 flex flex-col gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Fuentes verificadas por Gemini:</span>
-                            <div className="flex flex-wrap gap-2">
-                              {msg.citations.map((cite, idx) => (
-                                <a 
-                                  key={idx} 
-                                  href={cite.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[10px] bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-medium px-2 py-0.5 rounded transition"
-                                >
-                                  <FileText className="w-3 h-3" />
-                                  <span>{cite.title}</span>
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <span className="block text-[9px] text-right mt-1.5 text-slate-400/80 font-mono">{msg.timestamp}</span>
-                      </div>
-                    </div>
-                  ))}
-
-                {/* Gemini Loading / Typing Indicator Skeleton */}
-                {isChatLoading && (
-                  <div className="flex gap-3 max-w-3xl mr-auto animate-pulse">
-                    <div className="p-2.5 rounded-xl shrink-0 h-9 w-9 flex items-center justify-center border bg-indigo-950 border-indigo-900 text-indigo-400">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                    <div className="rounded-2xl px-4 py-3 bg-slate-950 border border-slate-800/60 text-slate-400 rounded-tl-none flex flex-col gap-2 min-w-[200px]">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        <span className="text-xs text-slate-400 font-medium ml-1">Gemini está analizando y calculando...</span>
-                      </div>
-                      <div className="h-2.5 bg-slate-900 rounded-full w-full"></div>
-                      <div className="h-2 bg-slate-900 rounded-full w-4/5"></div>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Chat Image attachment preview above input */}
-              {chatImageBase64 && (
-                <div className="px-6 py-2 bg-slate-950 border-t border-slate-800/80 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-12 h-12 rounded-lg border border-slate-800 overflow-hidden bg-slate-900 shrink-0">
-                      <img src={`data:${chatImageMimeType};base64,${chatImageBase64}`} alt="Preview" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-semibold text-slate-200 truncate max-w-[220px]">{chatImageName || "Foto de oferta.jpg"}</p>
-                      <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">{chatImageMimeType}</p>
-                    </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setChatImageBase64(null);
-                      setChatImageMimeType(null);
-                      setChatImageName(null);
-                    }}
-                    className="p-1.5 hover:bg-slate-900 rounded-full text-slate-400 hover:text-rose-400 transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Input Fijo Inferior */}
-              <form onSubmit={handleSendMessage} className="p-4 bg-slate-950 border-t border-slate-800/80">
-                <div className="relative flex items-center max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-xl focus-within:border-indigo-500 transition px-3 py-1 gap-2">
-                  
-                  {/* File upload click trigger for Chat Attachment */}
-                  <label className="p-2 hover:bg-slate-800 text-slate-400 hover:text-indigo-400 rounded-lg cursor-pointer transition shrink-0">
-                    <Image className="w-4 h-4" />
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={(e) => {
-                        if (!e.target.files || e.target.files.length === 0) return;
-                        const file = e.target.files[0];
-                        setChatImageName(file.name);
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const res = reader.result as string;
-                          const base64 = res.split(',')[1];
-                          setChatImageBase64(base64);
-                          setChatImageMimeType(file.type);
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
-
-                  <textarea
-                    ref={textareaRef}
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(e);
-                      }
-                    }}
-                    onPaste={(e) => {
-                      const items = e.clipboardData.items;
-                      for (let i = 0; i < items.length; i++) {
-                        if (items[i].type.indexOf("image") !== -1) {
-                          const file = items[i].getAsFile();
-                          if (file) {
-                            handleChatFileAttachment(file);
-                            e.preventDefault();
-                          }
-                        }
-                      }
-                    }}
-                    placeholder={activeSourceId ? "Hazle una pregunta a Gemini sobre esta fuente... (Shift+Enter para nueva línea)" : "Haz cualquier pregunta, arrastra imágenes/PDFs de facturas o pega fotos... (Shift+Enter para nueva línea)"}
-                    className="w-full bg-transparent border-0 text-sm text-white focus:outline-none py-2 resize-none max-h-32 min-h-[36px] placeholder-slate-500"
-                    disabled={isChatLoading}
-                    rows={1}
-                  />
-
-                  <button
-                    type="submit"
-                    className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md disabled:opacity-40 disabled:hover:bg-indigo-600 shrink-0"
-                    disabled={(!chatInput.trim() && !chatImageBase64) || isChatLoading}
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-              </form>
-
-            </div>
-          </div>
-        )}
 
         {/* SECCIÓN 3: HISTORIAL (MIGRADO A UN APARTADO PROPIO) */}
         {activeSection === 'historial' && (
@@ -2571,7 +2199,7 @@ export default function App() {
                       <span className="text-[10px] uppercase font-mono tracking-widest text-indigo-400 font-bold block">Historial de Registros</span>
                       <p className="text-xs text-slate-400 mt-0.5">Selecciona un día para visualizar su desglose de auditoría.</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                       <input
                         type="file"
                         accept=".json"
@@ -2581,21 +2209,21 @@ export default function App() {
                       />
                       <button
                         onClick={() => exportFileInputRef.current?.click()}
-                        className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/30 text-emerald-400 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                        className="px-3 py-2 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/30 text-emerald-400 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap"
                       >
                         <UploadCloud className="w-3.5 h-3.5" /> Importar
                       </button>
                       <button
                         onClick={() => setShowExportModal(true)}
-                        className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-950/30 text-indigo-400 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                        className="px-3 py-2 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-950/30 text-indigo-400 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap"
                       >
                         <Save className="w-3.5 h-3.5" /> Exportar / Backup
                       </button>
                       <select
                         value={selectedEntry.id}
-                      onChange={(e) => setSelectedHistoryEntryId(e.target.value)}
-                      className="bg-slate-900 border border-slate-800 rounded-xl text-xs py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
-                    >
+                        onChange={(e) => setSelectedHistoryEntryId(e.target.value)}
+                        className="col-span-2 w-full sm:w-auto bg-slate-900 border border-slate-800 rounded-xl text-xs py-2 px-3 text-slate-300 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
+                      >
                       {sortedYears.map((year) => {
                         const yearEntries = officialByYear[year] || [];
                         if (yearEntries.length === 0) return null;

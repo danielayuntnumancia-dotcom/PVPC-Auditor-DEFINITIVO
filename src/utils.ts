@@ -60,6 +60,17 @@ export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
 }
 
+import { Capacitor } from '@capacitor/core';
+
+export function getApiUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (Capacitor.isNativePlatform()) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://gen-lang-client-0735328299.web.app';
+    return `${baseUrl.replace(/\/$/, '')}${cleanPath}`;
+  }
+  return cleanPath;
+}
+
 export function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -71,3 +82,4 @@ export function downloadFile(content: string, filename: string, mimeType: string
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+

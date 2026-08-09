@@ -1,7 +1,9 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth, type UserInfo } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut, type Auth, type UserInfo } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, type Firestore } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import firebaseConfigJson from './firebase-applet-config.json';
 
 interface FirebaseConfig {
@@ -149,6 +151,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function loginWithGoogle() {
   if (!isFirebaseConfigured || !authInstance || !googleProvider) {
     throw new Error("Firebase is not fully configured yet.");
+  }
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle();
+    if (result.credential?.idToken) {
+      const credential = GoogleAuthProvider.credential(result.credential.idToken);
+      return await signInWithCredential(authInstance, credential);
+    }
+    return result;
   }
   return signInWithPopup(authInstance, googleProvider);
 }
