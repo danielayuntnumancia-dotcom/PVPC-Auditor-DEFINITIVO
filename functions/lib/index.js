@@ -77,15 +77,18 @@ async function fetchPublicPVPCData(date) {
         return null;
     }
 }
-// Shared Gemini Client
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-        headers: {
-            'User-Agent': 'aistudio-build',
+// Shared Gemini Client (Lazy initialization to prevent deployment timeout when env vars are unpopulated during CLI analysis)
+function getAiClient() {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "AIzaSy_placeholder_key_for_init";
+    return new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+            headers: {
+                'User-Agent': 'aistudio-build',
+            }
         }
-    }
-});
+    });
+}
 // --- API Endpoints ---
 // 1.7. Fetch PVPC Data from Public Endpoint (No Token Required)
 app.post("/api/audit/pvpc-public", async (req, res) => {
@@ -223,14 +226,13 @@ app.post("/api/audit/pvpc", async (req, res) => {
             fuentes: []
         };
         let fetchSucceeded = false;
-        // --- CAPA 1: API DIRECTA DE RED ELÉCTRICA (REE ESIOS) ---
+        // --- CAPA 1: API DIRECTA DE RED ELÉCTRICA (REE ESIOS APIDATOS) ---
         try {
-            // Intentamos usar la API pública de api.ree.es
-            const reeUrl = `https://api.ree.es/valdemoro/v1/providers/esios/indicators/1013?start_date=${fechaInicio}T00:00&end_date=${fechaFin}T23:59`;
-            console.log(`[PVPC Auditor] Intentando obtener datos reales desde la API de Red Eléctrica de España (REE)...`);
-            // Create timeout controller for compatibility with older Node.js versions
+            // Usamos el API REST oficial y activo de apidatos.ree.es para indicadores PVPC (1001)
+            const reeUrl = `https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${fechaInicio}T00:00&end_date=${fechaFin}T23:59&time_trunc=hour`;
+            console.log(`[PVPC Auditor] Intentando obtener datos reales desde apidatos.ree.es...`);
             const timeoutController = new AbortController();
-            const timeoutId = setTimeout(() => timeoutController.abort(), 6000); // 6 segundos de timeout máximo para la API
+            const timeoutId = setTimeout(() => timeoutController.abort(), 8000); // 8 segundos de timeout
             const response = await fetch(reeUrl, {
                 headers: {
                     'Accept': 'application/json',
@@ -241,9 +243,11 @@ app.post("/api/audit/pvpc", async (req, res) => {
             clearTimeout(timeoutId);
             if (response.ok) {
                 const data = await response.json();
-                const values = data.indicator?.values || data.values || [];
+                // Buscar el objeto PVPC dentro del array included
+                const pvpcObj = data.included?.find((item) => item.id === '1001' || item.type === 'PVPC');
+                const values = pvpcObj?.attributes?.values || [];
                 if (values && values.length > 0) {
-                    console.log(`[PVPC Auditor] Datos obtenidos con éxito de REE. Procesando ${values.length} registros.`);
+                    console.log(`[PVPC Auditor] Datos PVPC obtenidos con éxito de apidatos.ree.es. Procesando ${values.length} registros horarios.`);
                     let puntaSum = 0, puntaCount = 0;
                     let llanoSum = 0, llanoCount = 0;
                     let valleSum = 0, valleCount = 0;
@@ -294,17 +298,17 @@ app.post("/api/audit/pvpc", async (req, res) => {
                         result.costeEnergiaLlano = llanoCount > 0 ? Math.max(0.01, (llanoSum / llanoCount) - 0.029267) : defaultCosteLlano;
                         result.costeEnergiaValle = valleCount > 0 ? Math.max(0.01, (valleSum / valleCount) - 0.003292) : defaultCosteValle;
                         result.metodo = "Calculado de forma real y exacta de las medias horarias de Red Eléctrica de España (REE).";
-                        result.fuentes = [reeUrl];
+                        result.fuentes = ["https://apidatos.ree.es"];
                         fetchSucceeded = true;
                     }
                 }
             }
             else {
-                console.log(`[PVPC Auditor] API REE no accesible (status: ${response.status}). Buscando alternativa...`);
+                console.log(`[PVPC Auditor] API apidatos.ree.es no accesible (status: ${response.status}). Buscando alternativa...`);
             }
         }
         catch (e) {
-            console.log(`[PVPC Auditor] API REE fuera de línea o sin conectividad. Buscando alternativa...`);
+            console.log(`[PVPC Auditor] API REE apidatos fuera de línea o sin conectividad (${e.message}). Buscando alternativa...`);
         }
         // --- CAPA 2: BÚSQUEDA ASISTIDA POR GEMINI (SEARCH GROUNDING) ---
         if (!fetchSucceeded) {
@@ -320,7 +324,7 @@ Si encuentras los precios totales del PVPC con peajes, puedes restar los peajes 
 Si los datos de ese período exacto no están disponibles porque el período está en el futuro o es demasiado reciente, busca los datos reales más recientes disponibles (por ejemplo, el mes anterior o los últimos días) y utilízalos como la mejor estimación.
 
 Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurada en el JSON.`;
-                const response = await ai.models.generateContent({
+                const response = await getAiClient().models.generateContent({
                     model: "gemini-3.6-flash",
                     contents: prompt,
                     config: {
@@ -404,7 +408,7 @@ Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurad
                     result.costeEnergiaPunta = totalPunta / dayCount;
                     result.costeEnergiaLlano = totalLlano / dayCount;
                     result.costeEnergiaValle = totalValle / dayCount;
-                    result.metodo = "Calculado de forma real y exacta (Modelo Algorítmico Estacional PVPC) basándose en las medias del periodo seleccionado.";
+                    result.metodo = "Estimación basada en el Modelo Algorítmico Estacional PVPC (sin conexión en tiempo real con Red Eléctrica).";
                 }
                 else {
                     const month = isNaN(dStart.getTime()) ? 5 : dStart.getMonth();
@@ -412,7 +416,7 @@ Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurad
                     result.costeEnergiaPunta = 0.101788 * factor;
                     result.costeEnergiaLlano = 0.103931 * factor;
                     result.costeEnergiaValle = 0.120889 * factor;
-                    result.metodo = "Calculado de forma real y exacta (Modelo Algorítmico Estacional PVPC) basándose en el mes de inicio.";
+                    result.metodo = "Estimación basada en el Modelo Algorítmico Estacional PVPC (sin conexión en tiempo real con Red Eléctrica).";
                 }
                 result.fuentes = [
                     "https://www.esios.ree.es/es/lumios",
@@ -485,7 +489,7 @@ Devuelve obligatoriamente un objeto JSON (y NADA más de texto fuera del bloque 
 }
 
 Asegúrate de que la respuesta sea un JSON válido y legible.`;
-        const response = await ai.models.generateContent({
+        const response = await getAiClient().models.generateContent({
             model: "gemini-3.5-flash",
             contents: prompt,
             config: {
@@ -681,7 +685,7 @@ Reglas:
         };
         let responseText = "";
         try {
-            const response = await ai.models.generateContent({
+            const response = await getAiClient().models.generateContent({
                 model: "gemini-3.6-flash", // Use gemini-3.6-flash for faster and reliable free-tier multi-modal analysis
                 contents: [imagePart, promptPart],
                 config: {
@@ -720,7 +724,7 @@ Reglas:
         catch (primaryError) {
             console.warn("[PVPC Auditor] Error con gemini-3.6-flash al escanear, reintentando con gemini-3.6-flash:", primaryError);
             try {
-                const fallbackResponse = await ai.models.generateContent({
+                const fallbackResponse = await getAiClient().models.generateContent({
                     model: "gemini-3.6-flash", // Fallback lightweight model
                     contents: [imagePart, promptPart],
                     config: {
@@ -1021,7 +1025,7 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
         let response;
         let fallbackUsed = false;
         try {
-            response = await ai.models.generateContent({
+            response = await getAiClient().models.generateContent({
                 model: modelName,
                 contents,
                 config,
@@ -1034,7 +1038,7 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
                 const fallbackConfig = { ...config };
                 delete fallbackConfig.tools;
                 delete fallbackConfig.thinkingConfig;
-                response = await ai.models.generateContent({
+                response = await getAiClient().models.generateContent({
                     model: "gemini-3.6-flash",
                     contents,
                     config: fallbackConfig,
@@ -1046,7 +1050,7 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
                     const fallbackConfig = { ...config };
                     delete fallbackConfig.tools;
                     delete fallbackConfig.thinkingConfig;
-                    response = await ai.models.generateContent({
+                    response = await getAiClient().models.generateContent({
                         model: "gemini-3.6-flash",
                         contents,
                         config: fallbackConfig,
