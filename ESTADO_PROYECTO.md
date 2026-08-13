@@ -21,6 +21,10 @@
    - Compilación exitosa de Vite, servidor Node y Firebase Functions TypeScript (`tsc`).
    - Despliegue de producción publicado con éxito en **Firebase Hosting y Cloud Functions**: `https://gen-lang-client-0735328299.web.app`.
 
+4. **Integración de Icono Personalizado para PWA e iOS (iPhone):**
+   - Configuración de `apple-touch-icon.png` (512x512) y `manifest.json` para acceso directo en pantalla de inicio de iPhone.
+   - Habilitadas meta-etiquetas de PWA nativa (`apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, etc.) en `index.html`.
+
 ---
 
 ## 📋 Tareas pendientes para la próxima sesión
