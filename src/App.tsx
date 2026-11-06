@@ -2331,7 +2331,12 @@ export default function App() {
 
                   <div className="space-y-6">
                     <div className="border-b border-slate-800 pb-4">
-                      <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-500 font-semibold">Desglose Analítico</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-500 font-semibold">Desglose Analítico</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 truncate max-w-[180px]">
+                          {billData.nombreTarifa || 'PVPC 2.0TD'}
+                        </span>
+                      </div>
                       <h3 className="font-bold text-lg text-white mt-0.5">Réplica de Factura</h3>
                     </div>
 
@@ -2399,7 +2404,9 @@ export default function App() {
                           <span className="font-mono">{results.energiaValle.toFixed(2)} €</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-500 border-t border-slate-800 pt-0.5 mt-0.5">
-                          <span className="italic">Total energía</span>
+                          <span className="italic">
+                            Total energía {(billData.descuentoEnergia ?? 0) > 0 ? `(Dto. -${billData.descuentoEnergia}%)` : ''}
+                          </span>
                           <span className="font-mono">{results.totalEnergia.toFixed(2)} €</span>
                         </div>
                       </div>
@@ -2419,6 +2426,13 @@ export default function App() {
                         <span>Bono Social</span>
                         <span className="font-mono text-white">{results.totalBonoSocial.toFixed(2)} €</span>
                       </div>
+
+                      {(billData.serviciosAdicionales ?? 0) > 0 && (
+                        <div className="flex justify-between items-center text-slate-300">
+                          <span>Servicios / Mantenimiento</span>
+                          <span className="font-mono text-white">{(billData.serviciosAdicionales || 0).toFixed(2)} €</span>
+                        </div>
+                      )}
 
                       <div className="flex justify-between items-center text-slate-400 border-t border-slate-800 pt-3">
                         <span>Base Imponible</span>
