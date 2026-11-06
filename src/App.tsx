@@ -2126,23 +2126,37 @@ export default function App() {
                         <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-250">
                           <div className="grid grid-cols-3 gap-3">
                             <div className="border-l-2 border-red-500 pl-2">
-                              <label className="block text-[10px] text-slate-400 mb-1">Peaje Punta (€/kW/año)</label>
+                              <label className="block text-[10px] text-slate-400 mb-1">
+                                {billData.perfilTarifaId && billData.perfilTarifaId !== 'pvpc-regulado'
+                                  ? 'Precio Potencia Punta (€/kW/año)'
+                                  : 'Peaje Punta (€/kW/año)'}
+                              </label>
                               <input
                                 type="number" aria-invalid={hasError("precioKwPunta")} aria-describedby="billing-error-precioKwPunta" min="-100" max="100" step="0.000001"
                                 value={billData.precioKwPunta}
                                 onChange={e => setBillData(p => ({ ...p, precioKwPunta: Number(e.target.value) }))}
                                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-white"
                               />
+                              <span className="block text-[9px] font-mono text-slate-500 mt-1">
+                                ≈ {(billData.precioKwPunta / 365).toFixed(6)} €/kW/día
+                              </span>
 {hasError("precioKwPunta") && <div id="billing-error-precioKwPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "precioKwPunta")?.message}</div>}
                             </div>
                             <div className="border-l-2 border-emerald-500 pl-2">
-                              <label className="block text-[10px] text-slate-400 mb-1">Peaje Valle (€/kW/año)</label>
+                              <label className="block text-[10px] text-slate-400 mb-1">
+                                {billData.perfilTarifaId && billData.perfilTarifaId !== 'pvpc-regulado'
+                                  ? 'Precio Potencia Valle (€/kW/año)'
+                                  : 'Peaje Valle (€/kW/año)'}
+                              </label>
                               <input
                                 type="number" aria-invalid={hasError("precioKwValle")} aria-describedby="billing-error-precioKwValle" min="-100" max="100" step="0.000001"
                                 value={billData.precioKwValle}
                                 onChange={e => setBillData(p => ({ ...p, precioKwValle: Number(e.target.value) }))}
                                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-white"
                               />
+                              <span className="block text-[9px] font-mono text-slate-500 mt-1">
+                                ≈ {(billData.precioKwValle / 365).toFixed(6)} €/kW/día
+                              </span>
 {hasError("precioKwValle") && <div id="billing-error-precioKwValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "precioKwValle")?.message}</div>}
                             </div>
                             <div className="border-l-2 border-slate-500 pl-2">
@@ -2153,6 +2167,9 @@ export default function App() {
                                 onChange={e => setBillData(p => ({ ...p, precioMargen: Number(e.target.value) }))}
                                 className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-white"
                               />
+                              <span className="block text-[9px] font-mono text-slate-500 mt-1">
+                                ≈ {(billData.precioMargen / 365).toFixed(6)} €/kW/día
+                              </span>
 {hasError("precioMargen") && <div id="billing-error-precioMargen" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "precioMargen")?.message}</div>}
                             </div>
                           </div>
@@ -3050,20 +3067,115 @@ export default function App() {
                             <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded font-bold font-mono">P3</span>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-400 mt-4">
-                          ¿Quieres comprobar si tienes contratada la potencia idónea o si existe una tarifa libre/regulada de mercado que reduzca tu coste en base a este perfil real?
-                        </p>
-                      </div>
+                        {/* Balance Acumulado del Año e Indicadores Clave */}
+                        {(() => {
+                          const { sortedYears, officialByYear } = getSortedHistoryData();
+                          const targetYear = sortedYears[0] || new Date().getFullYear();
+                          const yearBills = (officialByYear[targetYear] && officialByYear[targetYear].length > 0)
+                            ? officialByYear[targetYear]
+                            : officialBills;
 
-                      {/* Botón de Analizar Mercado */}
-                      <div className="mt-6 border-t border-slate-900 pt-6 text-center">
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col items-center gap-2">
-                          <Scale className="w-6 h-6 text-slate-500" />
-                          <h4 className="text-sm font-bold text-slate-300">Buscador de Ofertas Deshabilitado</h4>
-                          <p className="text-xs text-slate-500 max-w-sm">
-                            El sistema de búsqueda en tiempo real mediante IA está temporalmente desactivado para evitar mostrar enlaces rotos o precios desactualizados del mercado.
-                          </p>
-                        </div>
+                          const totalYearPunta = yearBills.reduce((acc, b) => acc + b.billData.kwhPunta, 0);
+                          const totalYearLlano = yearBills.reduce((acc, b) => acc + b.billData.kwhLlano, 0);
+                          const totalYearValle = yearBills.reduce((acc, b) => acc + b.billData.kwhValle, 0);
+                          const totalYearKwh = totalYearPunta + totalYearLlano + totalYearValle;
+
+                          const totalYearSpent = yearBills.reduce((acc, b) => acc + b.results.totalFactura, 0);
+                          const totalYearVariable = yearBills.reduce((acc, b) => acc + b.results.totalVariable, 0);
+                          const totalYearFijo = yearBills.reduce((acc, b) => acc + b.results.totalFijo, 0);
+                          const totalYearDias = yearBills.reduce((acc, b) => acc + b.results.dias, 0);
+
+                          const effectiveKwhAllIn = totalYearKwh > 0 ? totalYearSpent / totalYearKwh : 0;
+                          const effectiveKwhEnergyOnly = totalYearKwh > 0 ? totalYearVariable / totalYearKwh : 0;
+                          const dailyAvgKwh = totalYearDias > 0 ? totalYearKwh / totalYearDias : 0;
+                          const dailyAvgEuro = totalYearDias > 0 ? totalYearSpent / totalYearDias : 0;
+
+                          const highestBill = [...yearBills].sort((a, b) => b.results.totalFactura - a.results.totalFactura)[0];
+                          const lowestBill = [...yearBills].sort((a, b) => a.results.totalFactura - b.results.totalFactura)[0];
+
+                          return (
+                            <div className="mt-6 border-t border-slate-800/80 pt-6 space-y-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-bold block">
+                                    Balance Acumulado Anual ({targetYear})
+                                  </span>
+                                  <h4 className="text-sm font-bold text-white mt-0.5">
+                                    Consumo Total del Año e Indicadores de Eficiencia
+                                  </h4>
+                                </div>
+                                <span className="text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
+                                  {yearBills.length} facturas • {totalYearDias} días acumulados
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* KPI 1: Consumo Total Anual en kWh */}
+                                <div className="bg-slate-900/70 border border-emerald-500/30 p-4 rounded-xl space-y-2">
+                                  <span className="text-[10px] uppercase font-mono text-emerald-400 font-bold block">
+                                    Consumo Total Acumulado
+                                  </span>
+                                  <div className="text-2xl font-black font-mono text-white">
+                                    {totalYearKwh.toFixed(1)} <span className="text-sm font-bold text-emerald-400">kWh</span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 flex flex-wrap gap-x-2.5 gap-y-0.5 pt-1 border-t border-slate-800/80">
+                                    <span className="text-rose-400">P1: {totalYearPunta.toFixed(0)}</span>
+                                    <span className="text-yellow-400">P2: {totalYearLlano.toFixed(0)}</span>
+                                    <span className="text-emerald-400">P3: {totalYearValle.toFixed(0)}</span>
+                                  </div>
+                                </div>
+
+                                {/* KPI 2: Gasto Total Acumulado en € */}
+                                <div className="bg-slate-900/70 border border-indigo-500/30 p-4 rounded-xl space-y-2">
+                                  <span className="text-[10px] uppercase font-mono text-indigo-400 font-bold block">
+                                    Gasto Total en el Año
+                                  </span>
+                                  <div className="text-2xl font-black font-mono text-white">
+                                    {totalYearSpent.toFixed(2)} <span className="text-sm font-bold text-indigo-400">€</span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
+                                    Potencia: {totalYearFijo.toFixed(2)} € • Consumo: {totalYearVariable.toFixed(2)} €
+                                  </div>
+                                </div>
+
+                                {/* KPI 3: Precio Medio Real por kWh */}
+                                <div className="bg-slate-900/70 border border-amber-500/30 p-4 rounded-xl space-y-2">
+                                  <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
+                                    Coste Real por kWh
+                                  </span>
+                                  <div className="text-2xl font-black font-mono text-white">
+                                    {effectiveKwhEnergyOnly.toFixed(4)} <span className="text-sm font-bold text-amber-400">€/kWh</span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
+                                    Todo incluido (con fijo+IVA): <strong className="text-slate-200">{effectiveKwhAllIn.toFixed(4)} €/kWh</strong>
+                                  </div>
+                                </div>
+
+                                {/* KPI 4: Ritmo Diario y Extremos */}
+                                <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-xl space-y-2">
+                                  <span className="text-[10px] uppercase font-mono text-slate-400 font-bold block">
+                                    Media Diaria y Picos
+                                  </span>
+                                  <div className="text-lg font-black font-mono text-white">
+                                    {dailyAvgKwh.toFixed(2)} kWh/día <span className="text-xs font-normal text-slate-400">({dailyAvgEuro.toFixed(2)} €/día)</span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80 flex flex-col gap-0.5">
+                                    {highestBill && (
+                                      <span className="truncate">
+                                        Máx: <strong className="text-rose-400">{highestBill.mesFacturacion || highestBill.dateStr}</strong> ({highestBill.results.totalFactura.toFixed(2)} €)
+                                      </span>
+                                    )}
+                                    {lowestBill && (
+                                      <span className="truncate">
+                                        Mín: <strong className="text-emerald-400">{lowestBill.mesFacturacion || lowestBill.dateStr}</strong> ({lowestBill.results.totalFactura.toFixed(2)} €)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
