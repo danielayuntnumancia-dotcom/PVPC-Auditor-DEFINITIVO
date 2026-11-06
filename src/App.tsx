@@ -3093,6 +3093,62 @@ export default function App() {
                           const highestBill = [...yearBills].sort((a, b) => b.results.totalFactura - a.results.totalFactura)[0];
                           const lowestBill = [...yearBills].sort((a, b) => a.results.totalFactura - b.results.totalFactura)[0];
 
+                          const supplierMap = new Map<string, {
+                            key: string;
+                            companyLabel: string;
+                            tarifaLabel: string;
+                            isFreeMarket: boolean;
+                            kwhPunta: number;
+                            kwhLlano: number;
+                            kwhValle: number;
+                            totalKwh: number;
+                            totalSpent: number;
+                            totalVariable: number;
+                            billsCount: number;
+                            daysCount: number;
+                          }>();
+
+                          yearBills.forEach((b) => {
+                            const matchedProfile = tariffProfiles.find(p => p.id === b.billData.perfilTarifaId);
+                            const tarifaLabel = b.billData.nombreTarifa || matchedProfile?.nombre || 'PVPC 2.0TD (Mercado Regulado)';
+                            const isFreeMarket = Boolean(
+                              (b.billData.perfilTarifaId && b.billData.perfilTarifaId !== 'pvpc-regulado') ||
+                              (matchedProfile && matchedProfile.modalidad !== 'pvpc')
+                            );
+                            const companyLabel = matchedProfile?.comercializadora || (isFreeMarket ? 'Mercado Libre' : 'Comercializadora Regulada');
+                            const groupKey = `${companyLabel}__${tarifaLabel}`;
+
+                            const kwhBill = b.billData.kwhPunta + b.billData.kwhLlano + b.billData.kwhValle;
+                            const existing = supplierMap.get(groupKey);
+                            if (existing) {
+                              existing.kwhPunta += b.billData.kwhPunta;
+                              existing.kwhLlano += b.billData.kwhLlano;
+                              existing.kwhValle += b.billData.kwhValle;
+                              existing.totalKwh += kwhBill;
+                              existing.totalSpent += b.results.totalFactura;
+                              existing.totalVariable += b.results.totalVariable;
+                              existing.billsCount += 1;
+                              existing.daysCount += b.results.dias;
+                            } else {
+                              supplierMap.set(groupKey, {
+                                key: groupKey,
+                                companyLabel,
+                                tarifaLabel,
+                                isFreeMarket,
+                                kwhPunta: b.billData.kwhPunta,
+                                kwhLlano: b.billData.kwhLlano,
+                                kwhValle: b.billData.kwhValle,
+                                totalKwh: kwhBill,
+                                totalSpent: b.results.totalFactura,
+                                totalVariable: b.results.totalVariable,
+                                billsCount: 1,
+                                daysCount: b.results.dias,
+                              });
+                            }
+                          });
+
+                          const supplierBreakdown = Array.from(supplierMap.values()).sort((a, b) => b.totalKwh - a.totalKwh);
+
                           return (
                             <div className="mt-6 border-t border-slate-800/80 pt-6 space-y-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3173,6 +3229,85 @@ export default function App() {
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Desglose Anual de Consumo y Gasto por Compañía Suministradora */}
+                              {supplierBreakdown.length > 0 && (
+                                <div className="bg-slate-900/50 border border-slate-800/90 rounded-xl p-4 space-y-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                                      Desglose de kWh Consumidos en el Año ({targetYear}) por Compañía
+                                    </span>
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      {supplierBreakdown.length} {supplierBreakdown.length === 1 ? 'empresa registrada' : 'empresas registradas'}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {supplierBreakdown.map((item) => {
+                                      const sharePct = totalYearKwh > 0 ? (item.totalKwh / totalYearKwh) * 100 : 0;
+                                      const avgPriceAllIn = item.totalKwh > 0 ? item.totalSpent / item.totalKwh : 0;
+                                      const avgPriceEnergy = item.totalKwh > 0 ? item.totalVariable / item.totalKwh : 0;
+                                      return (
+                                        <div
+                                          key={item.key}
+                                          className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5"
+                                        >
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs font-bold text-white truncate">
+                                                  {item.companyLabel}
+                                                </span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                                  item.isFreeMarket
+                                                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                                    : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                                }`}>
+                                                  {item.tarifaLabel}
+                                                </span>
+                                              </div>
+                                              <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                                                {item.billsCount} {item.billsCount === 1 ? 'factura' : 'facturas'} • {item.daysCount} días facturados
+                                              </span>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                              <div className="text-base font-black font-mono text-emerald-400">
+                                                {item.totalKwh.toFixed(1)} <span className="text-xs font-bold">kWh</span>
+                                              </div>
+                                              <span className="text-[10px] font-mono text-slate-400">
+                                                {sharePct.toFixed(1)}% del año
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Barra de proporción sobre el consumo anual */}
+                                          <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                            <div
+                                              className={`h-full rounded-full ${item.isFreeMarket ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                                              style={{ width: `${Math.min(100, Math.max(2, sharePct))}%` }}
+                                            />
+                                          </div>
+
+                                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[10px] font-mono">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-rose-400">P1: {item.kwhPunta.toFixed(0)}</span>
+                                              <span className="text-yellow-400">P2: {item.kwhLlano.toFixed(0)}</span>
+                                              <span className="text-emerald-400">P3: {item.kwhValle.toFixed(0)}</span>
+                                            </div>
+                                            <div className="text-slate-300">
+                                              <strong className="text-indigo-400">{item.totalSpent.toFixed(2)} €</strong>
+                                              <span className="text-slate-500"> • </span>
+                                              <span title={`Energía: ${avgPriceEnergy.toFixed(4)} €/kWh | Todo incl.: ${avgPriceAllIn.toFixed(4)} €/kWh`}>
+                                                {avgPriceEnergy.toFixed(4)} €/kWh
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
