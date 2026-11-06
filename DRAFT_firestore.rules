@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return isSignedIn() && request.auth.token.email == 'daniel.ayuntnumancia@gmail.com';
+      return isSignedIn() && request.auth.token.email_verified == true && request.auth.token.email == 'daniel.ayuntnumancia@gmail.com';
     }
 
     function isOwner(userId) {
@@ -21,7 +21,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     // Helper to get request payload
@@ -37,7 +37,8 @@ service cloud.firestore {
     // --- 3. ENTITY VALIDATION BLUEPRINTS ---
 
     function isValidBillData(data) {
-      return data.keys().hasAll(['fechaInicio', 'fechaFin', 'kwPunta', 'kwValle', 'kwhPunta', 'kwhLlano', 'kwhValle'])
+      return data.keys().hasOnly(['fechaInicio', 'fechaFin', 'presupuesto', 'kwPunta', 'kwValle', 'precioMargen', 'precioKwPunta', 'precioKwValle', 'kwhPunta', 'kwhLlano', 'kwhValle', 'precioKwhPunta', 'precioKwhLlano', 'precioKwhValle', 'costeEnergiaVariable', 'costeEnergiaPunta', 'costeEnergiaLlano', 'costeEnergiaValle', 'alqContador', 'bonoSocial', 'iee', 'ieeMinComunitario', 'iva', 'perfilTarifaId', 'nombreTarifa', 'descuentoEnergia', 'serviciosAdicionales'])
+        && data.keys().hasAll(['fechaInicio', 'fechaFin', 'kwPunta', 'kwValle', 'kwhPunta', 'kwhLlano', 'kwhValle'])
         && data.fechaInicio is string && data.fechaInicio.size() <= 50
         && data.fechaFin is string && data.fechaFin.size() <= 50
         && data.kwPunta is number && data.kwPunta >= 0 && data.kwPunta <= 100
@@ -70,7 +71,8 @@ service cloud.firestore {
     }
 
     function isValidHistoryEntry(entry) {
-      return entry.keys().hasAll(['id', 'dateStr', 'timestamp', 'billData', 'results', 'tipo'])
+      return entry.keys().hasOnly(['id', 'dateStr', 'timestamp', 'billData', 'results', 'tipo', 'mesFacturacion'])
+        && entry.keys().hasAll(['id', 'dateStr', 'timestamp', 'billData', 'results', 'tipo'])
         && isValidId(entry.id)
         && entry.dateStr is string && entry.dateStr.size() <= 50
         && entry.timestamp is number
@@ -80,7 +82,8 @@ service cloud.firestore {
     }
 
     function isValidSourceFile(source) {
-      return source.keys().hasAll(['id', 'name', 'timestamp', 'explanation'])
+      return source.keys().hasOnly(['id', 'name', 'timestamp', 'explanation', 'parsedData'])
+        && source.keys().hasAll(['id', 'name', 'timestamp', 'explanation'])
         && isValidId(source.id)
         && source.name is string && source.name.size() <= 200
         && source.timestamp is number
@@ -88,7 +91,8 @@ service cloud.firestore {
     }
 
     function isValidChatMessage(msg) {
-      return msg.keys().hasAll(['id', 'role', 'content', 'timestamp'])
+      return msg.keys().hasOnly(['id', 'role', 'content', 'timestamp', 'citations', 'sourceFileId', 'imageUrl'])
+        && msg.keys().hasAll(['id', 'role', 'content', 'timestamp'])
         && isValidId(msg.id)
         && msg.role is string && (msg.role == 'user' || msg.role == 'assistant')
         && msg.content is string && msg.content.size() <= 50000
@@ -123,9 +127,9 @@ service cloud.firestore {
       match /history/{entryId} {
         allow get: if isOwner(userId) && isEmailVerified() && isValidId(entryId);
         allow list: if isOwner(userId) && isEmailVerified();
-        allow create: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming());
-        allow update: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming()) 
-                      && incoming().id == existing().id; // prevent mutating id
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming()) && incoming().id == entryId;
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming()) && incoming().id == entryId
+                      && incoming().id == existing().id && incoming().timestamp == existing().timestamp; // immutable identity and creation time
         allow delete: if isOwner(userId) && isEmailVerified() && isValidId(entryId);
       }
 
@@ -133,9 +137,9 @@ service cloud.firestore {
       match /sources/{sourceId} {
         allow get: if isOwner(userId) && isEmailVerified() && isValidId(sourceId);
         allow list: if isOwner(userId) && isEmailVerified();
-        allow create: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming());
-        allow update: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming())
-                      && incoming().id == existing().id;
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming()) && incoming().id == sourceId;
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming()) && incoming().id == sourceId
+                      && incoming().id == existing().id && incoming().timestamp == existing().timestamp;
         allow delete: if isOwner(userId) && isEmailVerified() && isValidId(sourceId);
       }
 
@@ -143,9 +147,9 @@ service cloud.firestore {
       match /chats/{chatId} {
         allow get: if isOwner(userId) && isEmailVerified() && isValidId(chatId);
         allow list: if isOwner(userId) && isEmailVerified();
-        allow create: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming());
-        allow update: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming())
-                      && incoming().id == existing().id;
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming()) && incoming().id == chatId;
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming()) && incoming().id == chatId
+                      && incoming().id == existing().id && incoming().timestamp == existing().timestamp;
         allow delete: if isOwner(userId) && isEmailVerified() && isValidId(chatId);
       }
 
@@ -153,8 +157,8 @@ service cloud.firestore {
       match /tariffProfiles/{profileId} {
         allow get: if isOwner(userId) && isEmailVerified() && isValidId(profileId);
         allow list: if isOwner(userId) && isEmailVerified();
-        allow create: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming());
-        allow update: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming())
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming()) && incoming().id == profileId;
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming()) && incoming().id == profileId
                       && incoming().id == existing().id;
         allow delete: if isOwner(userId) && isEmailVerified() && isValidId(profileId);
       }

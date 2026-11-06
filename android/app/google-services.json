@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "302419656848-78v06rd8ihno7oghfp4stgq6nsmp4am8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pvpcauditor.app",
+            "certificate_hash": "9b0d741fbe0ff39a11a991c92582fb4ceaab3491"
+          }
+        },
+        {
           "client_id": "302419656848-uhnf1o6rdmr1vaukm7etpjull3vqktuo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

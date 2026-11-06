@@ -21,38 +21,14 @@ test('[VALIDO] GET / responde HTTP 200 y contenido HTML', async () => {
   }
 });
 
-test('[VALIDO] POST /api/audit/pvpc sin fechas responde HTTP 400', async () => {
-  const response = await fetch(`${BASE_URL}/api/audit/pvpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
+for (const route of ['/api/audit/pvpc', '/api/audit/scan-bill', '/api/audit/compare-market', '/api/gemini/chat']) {
+  test(`[SEGURIDAD] POST ${route} sin sesi?n responde HTTP 401`, async () => {
+    const response = await fetch(`${BASE_URL}${route}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    });
+    assert.equal(response.status, 401);
   });
-  assert.equal(response.status, 400);
-  const data = await response.json();
-  assert.equal(data.error, 'Faltan las fechas de inicio y fin.');
-});
-
-test('[VALIDO] POST /api/audit/scan-bill sin imagen responde HTTP 400', async () => {
-  const response = await fetch(`${BASE_URL}/api/audit/scan-bill`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
-  });
-  assert.equal(response.status, 400);
-  const data = await response.json();
-  assert.equal(data.error, 'Falta la imagen de la factura.');
-});
-
-test('[VALIDO] POST /api/audit/compare-market sin consumos responde HTTP 400', async () => {
-  const response = await fetch(`${BASE_URL}/api/audit/compare-market`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
-  });
-  assert.equal(response.status, 400);
-  const data = await response.json();
-  assert.equal(data.error, 'Faltan los datos de consumo promedio.');
-});
+}
 
 test('[ESTATICO] rutas servidor', () => {
   const serverTs = fs.readFileSync(path.join(rootDir, 'server.ts'), 'utf-8');
@@ -64,13 +40,14 @@ test('[ESTATICO] rutas servidor', () => {
 
 test('[ESTATICO] límite de cuerpo', () => {
   const serverTs = fs.readFileSync(path.join(rootDir, 'server.ts'), 'utf-8');
-  assert.ok(serverTs.includes('limit: "10mb"'));
+  const security = fs.readFileSync(path.join(rootDir, 'functions/security.ts'), 'utf-8');
+  assert.ok(security.includes("limit: '10mb'"));
 });
 
 test('[ESTATICO] seguridad', () => {
   const serverTs = fs.readFileSync(path.join(rootDir, 'server.ts'), 'utf-8');
-  assert.equal(serverTs.includes('apiRateLimiter') || serverTs.includes('rateLimit'), true);
-  assert.equal(serverTs.includes('requireAuth'), false);
+  assert.ok(serverTs.includes('configureApiSecurity'));
+  assert.ok(serverTs.includes('verifyIdToken(token, true)'));
 });
 
 test('[ESTATICO] fallback PVPC', () => {

@@ -67,12 +67,6 @@ test('[ESTATICO] archivos de producción', () => {
   assert.equal(fs.existsSync(path.join(rootDir, 'src', 'domain', 'billing', 'index.ts')), true);
 });
 
-test('[ESTATICO] componentes residuales', () => {
-  assert.equal(fs.existsSync(path.join(rootDir, 'src', 'components', 'BillOptimizer.tsx')), true);
-  assert.equal(fs.existsSync(path.join(rootDir, 'src', 'components', 'ChatBot.tsx')), true);
-  assert.equal(fs.existsSync(path.join(rootDir, 'src', 'components', 'Scanner.tsx')), true);
-});
-
 test('[ESTATICO] dependencias principales', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
   assert.ok(pkg.dependencies['react']);

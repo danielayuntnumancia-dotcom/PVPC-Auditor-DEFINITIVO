@@ -6,3 +6,16 @@ coverage/
 *.log
 .env*
 !.env.example
+*.jks
+*.keystore
+*.p12
+*.apk
+*.aab
+signing.properties
+
+# Local build, deployment and editor state
+.firebase/
+.artifacts/
+.idea/
+.vscode/
+releases/

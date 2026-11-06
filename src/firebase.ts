@@ -54,7 +54,7 @@ if (isFirebaseConfigured && finalConfig) {
     app = getApps().length === 0 ? initializeApp(finalConfig) : getApp();
     
     // Inicializar Firebase App Check con reCAPTCHA Enterprise
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
       initializeAppCheck(app, {
         provider: new ReCaptchaEnterpriseProvider('6LeylmQtAAAAAIS7gYLs6f5Sb6IhfGhinRYt8zb2'),
         isTokenAutoRefreshEnabled: true
@@ -158,12 +158,20 @@ export async function loginWithGoogle() {
       const credential = GoogleAuthProvider.credential(result.credential.idToken);
       return await signInWithCredential(authInstance, credential);
     }
-    return result;
+    throw new Error("Google no ha devuelto una credencial válida. Vuelve a intentar iniciar sesión.");
   }
   return signInWithPopup(authInstance, googleProvider);
 }
 
 export async function logoutUser() {
   if (!authInstance) return;
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await FirebaseAuthentication.signOut();
+    } finally {
+      await signOut(authInstance);
+    }
+    return;
+  }
   return signOut(authInstance);
 }

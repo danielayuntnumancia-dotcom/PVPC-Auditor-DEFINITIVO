@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe una versión anterior o su diseño. Los archivos antiguos que menciona se retiraron o dejaron de estar conectados a la interfaz. Para configurar, compilar o desplegar la versión actual, consultar [README.md](README.md).
+
 # 🔧 Configuración de Firebase - Guía de Implementación
 
 ## ✅ Lo que se ha implementado

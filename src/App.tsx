@@ -1,3 +1,4 @@
+import { apiFetch, validateUpload } from "./api";
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calculator, 
@@ -29,11 +30,12 @@ import {
   Settings
 } from 'lucide-react';
 import { BillData, BillResults, SourceFile, ChatMessage, HistoryEntry, MarketAnalysisData, MarketOffer, TariffProfile, TariffModality } from './types';
-import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile, getApiUrl } from './utils';
+import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile } from './utils';
 import BillChart from './components/BillChart';
 import ComparisonChart from './components/ComparisonChart';
 import CustomDatePicker from './components/CustomDatePicker';
 import MessageRenderer from './components/MessageRenderer';
+import { useAndroidBack } from './hooks/useAndroidBack';
 import { 
   db, 
   auth, 
@@ -88,6 +90,16 @@ export default function App() {
   const [pvpcFetchMethod, setPvpcFetchMethod] = useState<string | null>(null);
   const [pvpcFetchSuccess, setPvpcFetchSuccess] = useState<boolean>(false);
   const [pvpcFetchError, setPvpcFetchError] = useState<string | null>(null);
+  const pvpcRequestRef = useRef<AbortController | null>(null);
+
+  const cancelPvpcSync = () => {
+    pvpcRequestRef.current?.abort();
+    pvpcRequestRef.current = null;
+    setIsFetchingPvpc(false);
+    setPvpcFetchSuccess(false);
+    setPvpcFetchMethod(null);
+    setPvpcFetchError(null);
+  };
 
   // --- ANALIZADOR DE MERCADO CON IA ---
   const [marketAnalysis, setMarketAnalysis] = useState<MarketAnalysisData | null>(null);
@@ -107,7 +119,7 @@ export default function App() {
     setMarketAnalysis(null);
 
     try {
-      const response = await fetch(getApiUrl('/api/audit/compare-market'), {
+      const response = await apiFetch('/api/audit/compare-market', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -312,6 +324,7 @@ export default function App() {
   };
 
   const handleApplyTariffProfile = (profile: TariffProfile) => {
+    cancelPvpcSync();
     setBillData(prev => ({
       ...prev,
       perfilTarifaId: profile.id,
@@ -435,7 +448,7 @@ export default function App() {
       id: editingEntryId,
       dateStr: editDateStr.trim(),
       tipo: editTipo,
-      timestamp: Date.now(),
+      timestamp: history.find(entry => entry.id === editingEntryId)?.timestamp || Date.now(),
       mesFacturacion: editTipo === 'oficial' ? editMesFacturacion.trim() : undefined,
       billData: deepClone(editBillData),
       results: calculated
@@ -472,6 +485,7 @@ export default function App() {
   const [billData, setBillData] = useState<BillData>(() => {
     return safeParse<BillData | null>(localStorage.getItem('pvpc_bill_data'), DEFAULT_PVPC_VALUES) || DEFAULT_PVPC_VALUES;
   });
+  const isPvpcProfile = !billData.perfilTarifaId || billData.perfilTarifaId === 'pvpc-regulado';
 
   const [ieeSelection, setIeeSelection] = useState<'standard' | 'mincomunitario' | 'custom'>(() => {
     if ((billData.ieeMinComunitario ?? 0) > 0) return 'mincomunitario';
@@ -550,6 +564,8 @@ export default function App() {
 
   const handleChatFileAttachment = (file: File) => {
     if (!file) return;
+    const uploadError = validateUpload(file);
+    if (uploadError) { triggerAlert(uploadError); return; }
     
     if (file.type.startsWith('image/')) {
       setChatImageName(file.name);
@@ -595,7 +611,7 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       // Check if user is logged in and their email is in the allowed list
-      if (firebaseUser && firebaseUser.email && !ALLOWED_EMAILS.includes(firebaseUser.email)) {
+      if (firebaseUser && (!firebaseUser.emailVerified || !firebaseUser.email || !ALLOWED_EMAILS.includes(firebaseUser.email))) {
         console.warn(`Access denied for unauthorized email: ${firebaseUser.email}`);
         await logoutUser();
         setUser(null);
@@ -682,6 +698,8 @@ export default function App() {
         localStorage.removeItem('pvpc_history');
         localStorage.removeItem('pvpc_sources');
         localStorage.removeItem('pvpc_chats');
+        localStorage.removeItem('pvpc_tariff_profiles');
+        setTariffProfiles(DEFAULT_TARIFF_PROFILES);
 
         setBillData(DEFAULT_PVPC_VALUES);
         setHistory([]);
@@ -990,24 +1008,26 @@ export default function App() {
   };
 
   const handleFetchRealPrices = async () => {
-    if (hasError('fechaInicio') || hasError('fechaFin')) {
-      setIsFetchingPvpc(false);
-      return;
-    }
+    if (!isPvpcProfile || !user || hasError('fechaInicio') || hasError('fechaFin')) return;
+    pvpcRequestRef.current?.abort();
+    const controller = new AbortController();
+    pvpcRequestRef.current = controller;
+    const { fechaInicio, fechaFin } = billData;
     setIsFetchingPvpc(true);
     setPvpcFetchError(null);
     setPvpcFetchSuccess(false);
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch(getApiUrl("/api/audit/pvpc"), {
+      const response = await apiFetch("/api/audit/pvpc", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          fechaInicio: billData.fechaInicio,
-          fechaFin: billData.fechaFin
+          fechaInicio,
+          fechaFin
         })
       });
 
@@ -1016,14 +1036,21 @@ export default function App() {
       }
 
       const data = await response.json();
+      if (controller.signal.aborted || pvpcRequestRef.current !== controller) return;
       
       // Update variables in billData
-      setBillData(prev => ({
-        ...prev,
-        costeEnergiaPunta: data.costeEnergiaPunta,
-        costeEnergiaLlano: data.costeEnergiaLlano,
-        costeEnergiaValle: data.costeEnergiaValle
-      }));
+      setBillData(prev => {
+        // A response for an earlier profile or billing period must never replace contract prices.
+        if (controller.signal.aborted || pvpcRequestRef.current !== controller ||
+            (prev.perfilTarifaId && prev.perfilTarifaId !== 'pvpc-regulado') ||
+            prev.fechaInicio !== fechaInicio || prev.fechaFin !== fechaFin) return prev;
+        return {
+          ...prev,
+          costeEnergiaPunta: data.costeEnergiaPunta,
+          costeEnergiaLlano: data.costeEnergiaLlano,
+          costeEnergiaValle: data.costeEnergiaValle
+        };
+      });
 
       setPvpcFetchMethod(data.metodo || "Cargado correctamente");
       setPvpcFetchSuccess(true);
@@ -1031,11 +1058,12 @@ export default function App() {
       // Auto open advanced prices panel so user can see what has been updated
       setIsAdvancedPricesOpen(true);
     } catch (err: unknown) {
+      if (controller.signal.aborted || pvpcRequestRef.current !== controller) return;
       console.error(err);
       const msg = err instanceof Error ? err.message : String(err);
       setPvpcFetchError(msg || "Error al conectar con el servidor para obtener los precios.");
     } finally {
-      setIsFetchingPvpc(false);
+      if (pvpcRequestRef.current === controller) setIsFetchingPvpc(false);
     }
   };
 
@@ -1050,7 +1078,7 @@ export default function App() {
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch(getApiUrl("/api/audit/esios-energy-costs"), {
+      const response = await apiFetch("/api/audit/esios-energy-costs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1100,7 +1128,7 @@ export default function App() {
     setPvpcFetchMethod(null);
 
     try {
-      const response = await fetch(getApiUrl("/api/audit/pvpc-public"), {
+      const response = await apiFetch("/api/audit/pvpc-public", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1142,11 +1170,12 @@ export default function App() {
   // --- SINCRONIZACIÓN AUTOMÁTICA DE PRECIOS AL CAMBIAR LAS FECHAS ---
   const isFirstMount = useRef(true);
   useEffect(() => {
+    cancelPvpcSync();
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
     }
-    if (!billData.fechaInicio || !billData.fechaFin) return;
+    if (!isPvpcProfile || !user || !billData.fechaInicio || !billData.fechaFin) return;
     if (hasError('fechaInicio') || hasError('fechaFin')) return;
 
     // Resetear temporalmente el éxito anterior para indicar cambio de fechas
@@ -1158,8 +1187,12 @@ export default function App() {
       handleFetchRealPrices();
     }, 600);
 
-    return () => clearTimeout(timer);
-  }, [billData.fechaInicio, billData.fechaFin]);
+    return () => {
+      clearTimeout(timer);
+      pvpcRequestRef.current?.abort();
+      pvpcRequestRef.current = null;
+    };
+  }, [billData.fechaInicio, billData.fechaFin, billData.perfilTarifaId, user]);
 
   // --- EJECUCIÓN DEL MOTOR DE CÁLCULO ---
   const results: BillResults | null = validationResult.isValid
@@ -1175,6 +1208,8 @@ export default function App() {
       if (!e.target.files || e.target.files.length === 0) return;
       file = e.target.files[0];
     }
+    const uploadError = validateUpload(file);
+    if (uploadError) { triggerAlert(uploadError); return; }
     setIsUploading(true);
 
     try {
@@ -1190,7 +1225,7 @@ export default function App() {
       reader.readAsDataURL(file);
       const base64Data = await base64Promise;
 
-      const response = await fetch(getApiUrl("/api/audit/scan-bill"), {
+      const response = await apiFetch("/api/audit/scan-bill", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1325,7 +1360,7 @@ export default function App() {
                           currentInput.toLowerCase().includes('http') ||
                           currentInput.toLowerCase().includes('web');
 
-      const response = await fetch(getApiUrl("/api/gemini/chat"), {
+      const response = await apiFetch("/api/gemini/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1401,8 +1436,32 @@ export default function App() {
     }
   };
 
+  const exitNotice = useAndroidBack(
+    { section: activeSection, historyEntryId: activeSection === 'historial' ? selectedHistoryEntryId : null },
+    screen => {
+      setSelectedHistoryEntryId(screen.historyEntryId);
+      setActiveSection(screen.section);
+    },
+    () => {
+      if (showConfirmModal) { setShowConfirmModal(false); return true; }
+      if (showTariffModal) { setShowTariffModal(false); return true; }
+      if (showExportModal) { setShowExportModal(false); return true; }
+      if (showEditModal) { setShowEditModal(false); return true; }
+      if (showAlertModal) { setShowAlertModal(false); return true; }
+      if (showPromptModal) { setShowPromptModal(false); return true; }
+      if (showLoadPrompt) { setShowLoadPrompt(false); setPendingData(null); return true; }
+      return false;
+    },
+    user?.uid || null,
+  );
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col md:flex-row antialiased">
+    <div className="app-shell min-h-screen min-w-0 bg-slate-900 text-slate-100 flex flex-col md:flex-row antialiased">
+      {exitNotice && (
+        <div role="status" aria-live="polite" className="pointer-events-none fixed bottom-20 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-center text-sm text-white shadow-xl">
+          {exitNotice}
+        </div>
+      )}
       
       {/* --- CABECERA MÓVIL --- */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 shrink-0 sticky top-0 z-40">
@@ -1410,7 +1469,7 @@ export default function App() {
           <Zap className="w-5 h-5 text-emerald-400 fill-current" />
           <div className="flex flex-col">
             <span className="font-bold text-sm tracking-tight text-white leading-none">PVPC AUDITOR</span>
-            <span className="text-[8px] text-slate-500 font-mono">v4.1 Debug</span>
+            <span className="text-[8px] text-slate-500 font-mono">v1.1.1</span>
           </div>
         </div>
         
@@ -1699,7 +1758,7 @@ export default function App() {
             </div>
           )}
           
-          <p className="text-[10px] text-slate-500 font-mono text-center">v4.1 • Tarifa PVPC 2.0TD</p>
+          <p className="text-[10px] text-slate-500 font-mono text-center">v1.1.1 • Tarifa PVPC 2.0TD</p>
         </div>
       </aside>
 
@@ -1741,7 +1800,7 @@ export default function App() {
       </nav>
 
       {/* --- CONTENIDO PRINCIPAL DINÁMICO --- */}
-      <main className="flex-1 overflow-y-auto pb-20 md:pb-0 h-screen flex flex-col">
+      <main className="min-w-0 flex-1 overflow-y-auto pb-20 md:pb-0 h-screen flex flex-col">
         
         {/* SECCIÓN 1: CALCULADORA */}
         {activeSection === 'calculadora' && (
@@ -1816,12 +1875,12 @@ export default function App() {
             </div>
 
             {/* Barra de Perfiles de Tarifa (Mercado Libre / PVPC) */}
-            <div className="bg-slate-950/90 p-4 rounded-2xl border border-indigo-500/30 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3">
+            <div className="tariff-profile-panel min-w-0 bg-slate-950/90 p-4 rounded-2xl border border-indigo-500/30 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-1 items-start sm:items-center gap-3">
                 <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-indigo-400 shrink-0">
                   <Settings className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Perfil de Tarifa Activo</span>
                     {billData.nombreTarifa && (
@@ -1836,7 +1895,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="grid w-full min-w-0 grid-cols-1 items-center gap-2.5 lg:flex lg:w-auto lg:flex-wrap">
                 <select
                   aria-label="Seleccionar perfil de tarifa"
                   value={billData.perfilTarifaId || 'pvpc-regulado'}
@@ -1844,7 +1903,7 @@ export default function App() {
                     const found = tariffProfiles.find(p => p.id === e.target.value);
                     if (found) handleApplyTariffProfile(found);
                   }}
-                  className="bg-slate-900 border border-slate-700 hover:border-indigo-500/60 rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  className="w-full min-w-0 max-w-full truncate bg-slate-900 border border-slate-700 hover:border-indigo-500/60 rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 cursor-pointer lg:w-auto lg:max-w-md"
                 >
                   {tariffProfiles.map(profile => (
                     <option key={profile.id} value={profile.id}>
@@ -2031,6 +2090,8 @@ export default function App() {
                   </div>
 
                   {/* Sincronización de Costes de Energía Reales (REE ESIOS / Lumios) */}
+                  {isPvpcProfile && (
+                  <>
                   <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/30 p-4 rounded-xl border border-slate-800/50">
                     <div className="space-y-1">
                       <div className="flex items-center gap-1.5">
@@ -2090,6 +2151,8 @@ export default function App() {
                         <p className="text-[11px] text-slate-300">{pvpcFetchError}</p>
                       </div>
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
 
@@ -2181,11 +2244,11 @@ export default function App() {
 
                   <div>
                     <h3 className="text-sm font-semibold tracking-wider text-slate-400 uppercase border-b border-slate-800 pb-2">Término Variable (Consumo Real en kWh)</h3>
-                    <div className="grid grid-cols-3 gap-4 mt-3">
-                      <div className="border-l-4 border-red-500 pl-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="block text-xs text-slate-400">P1 - Punta</label>
-                          <span className="text-[10px] text-red-400 font-mono font-bold">
+                    <div className="consumption-periods grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+                      <div className="min-w-0 border-l-4 border-red-500 pl-3">
+                        <div className="flex justify-between items-baseline gap-2 mb-1">
+                          <label className="block whitespace-nowrap text-xs text-slate-400">P1 - Punta</label>
+                          <span className="shrink-0 text-[10px] text-red-400 font-mono font-bold tabular-nums">
                             {billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 
                               ? ((billData.kwhPunta / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) 
                               : "0.0"}%
@@ -2194,10 +2257,10 @@ export default function App() {
                         <input type="number" aria-invalid={hasError("kwhPunta")} aria-describedby="billing-error-kwhPunta" min="0" max="999999" step="1" value={billData.kwhPunta} onChange={e => setBillData(p => ({...p, kwhPunta: Number(e.target.value)}))} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-sm font-mono text-white" />
 {hasError("kwhPunta") && <div id="billing-error-kwhPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwhPunta")?.message}</div>}
                       </div>
-                      <div className="border-l-4 border-yellow-500 pl-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="block text-xs text-slate-400">P2 - Llano</label>
-                          <span className="text-[10px] text-yellow-400 font-mono font-bold">
+                      <div className="min-w-0 border-l-4 border-yellow-500 pl-3">
+                        <div className="flex justify-between items-baseline gap-2 mb-1">
+                          <label className="block whitespace-nowrap text-xs text-slate-400">P2 - Llano</label>
+                          <span className="shrink-0 text-[10px] text-yellow-400 font-mono font-bold tabular-nums">
                             {billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 
                               ? ((billData.kwhLlano / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) 
                               : "0.0"}%
@@ -2206,10 +2269,10 @@ export default function App() {
                         <input type="number" aria-invalid={hasError("kwhLlano")} aria-describedby="billing-error-kwhLlano" min="0" max="999999" step="1" value={billData.kwhLlano} onChange={e => setBillData(p => ({...p, kwhLlano: Number(e.target.value)}))} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-sm font-mono text-white" />
 {hasError("kwhLlano") && <div id="billing-error-kwhLlano" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwhLlano")?.message}</div>}
                       </div>
-                      <div className="border-l-4 border-emerald-500 pl-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="block text-xs text-slate-400">P3 - Valle</label>
-                          <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                      <div className="min-w-0 border-l-4 border-emerald-500 pl-3">
+                        <div className="flex justify-between items-baseline gap-2 mb-1">
+                          <label className="block whitespace-nowrap text-xs text-slate-400">P3 - Valle</label>
+                          <span className="shrink-0 text-[10px] text-emerald-400 font-mono font-bold tabular-nums">
                             {billData.kwhPunta + billData.kwhLlano + billData.kwhValle > 0 
                               ? ((billData.kwhValle / (billData.kwhPunta + billData.kwhLlano + billData.kwhValle)) * 100).toFixed(1) 
                               : "0.0"}%

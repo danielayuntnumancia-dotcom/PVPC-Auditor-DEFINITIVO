@@ -1,3 +1,6 @@
+import { configureApiSecurity, apiErrorHandler } from "./functions/security.js";
+import { getAuth } from "firebase-admin/auth";
+import { getApps, initializeApp } from "firebase-admin/app";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import express from "express";
 import path from "path";
@@ -6,39 +9,12 @@ import { createServer as createViteServer } from "vite";
 
 dotenv.config();
 
+if (getApps().length === 0) {
+  initializeApp({ projectId: process.env.GOOGLE_CLOUD_PROJECT || 'gen-lang-client-0735328299' });
+}
 const app = express();
-// Limit payloads to 10mb to prevent memory exhaustion DoS while supporting bill scans
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
-
-// Security headers middleware
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  next();
-});
-
-// Basic in-memory rate limiting for API endpoints (max 60 requests / 15 min per IP)
-const apiRateLimiter = new Map<string, { count: number; resetAt: number }>();
-app.use("/api/", (req, res, next) => {
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000;
-  const maxRequests = 60;
-  const record = apiRateLimiter.get(ip);
-
-  if (!record || now > record.resetAt) {
-    apiRateLimiter.set(ip, { count: 1, resetAt: now + windowMs });
-    return next();
-  }
-
-  if (record.count >= maxRequests) {
-    return res.status(429).json({ error: "Demasiadas solicitudes. Por favor, inténtalo de nuevo en unos minutos." });
-  }
-
-  record.count++;
-  next();
+configureApiSecurity(app, async (token) => {
+  return getAuth().verifyIdToken(token, true);
 });
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -60,7 +36,8 @@ function validateIsoDateRange(fechaInicio: unknown, fechaFin: unknown, maxDays =
   }
   const start = new Date(`${fechaInicio}T00:00:00Z`);
   const end = new Date(`${fechaFin}T00:00:00Z`);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) ||
+      start.toISOString().slice(0, 10) !== fechaInicio || end.toISOString().slice(0, 10) !== fechaFin) {
     return { valid: false, error: "Las fechas proporcionadas no son válidas." };
   }
   if (end < start) {
@@ -149,10 +126,12 @@ async function fetchPublicPVPCData(date: string) {
 
 // Shared Gemini Client (Lazy initialization to prevent deployment timeout when env vars are unpopulated during CLI analysis)
 function getAiClient() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "AIzaSy_placeholder_key_for_init";
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada en el servidor.");
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
+      timeout: 30000,
       headers: {
         'User-Agent': 'aistudio-build',
       }
@@ -227,7 +206,7 @@ app.post("/api/audit/pvpc-public", async (req, res) => {
 
   } catch (error: any) {
     console.error("Error al obtener datos públicos de PVPC:", error);
-    res.status(500).json({ error: error.message || "Error procesando la solicitud de PVPC público." });
+    res.status(500).json({ error: "Error procesando la solicitud de PVPC público." });
   }
 });
 
@@ -292,7 +271,7 @@ app.post("/api/audit/esios-energy-costs", async (req, res) => {
 
   } catch (error: any) {
     console.error("Error al obtener datos de ESIOS:", error);
-    res.status(500).json({ error: error.message || "Error procesando la solicitud de ESIOS." });
+    res.status(500).json({ error: "Error procesando la solicitud de ESIOS." });
   }
 });
 
@@ -547,7 +526,7 @@ Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurad
     res.json(result);
   } catch (error: any) {
     console.error("Error al obtener datos de PVPC:", error);
-    res.status(500).json({ error: error.message || "Error procesando la solicitud de PVPC." });
+    res.status(500).json({ error: "Error procesando la solicitud de PVPC." });
   }
 });
 
@@ -919,7 +898,7 @@ Reglas:
     res.json(parsedData);
   } catch (error: any) {
     console.error("Error al escanear la factura con Gemini:", error);
-    res.status(500).json({ error: error.message || "Error procesando la imagen de la factura." });
+    res.status(500).json({ error: "Error procesando la imagen de la factura." });
   }
 });
 
@@ -1231,9 +1210,12 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
     res.json({ text, citations });
   } catch (error: any) {
     console.error("Error en chat de Gemini:", error);
-    res.status(500).json({ error: error.message || "Error al procesar la consulta." });
+    res.status(500).json({ error: "Error al procesar la consulta." });
   }
 });
+
+app.use("/api", (_req, res) => { res.status(404).json({ error: "Ruta de API no encontrada." }); });
+app.use(apiErrorHandler);
 
 // --- Server & Vite Middleware Configuration ---
 async function startServer() {
@@ -1246,7 +1228,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     // Production mode
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), 'dist', 'client');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
