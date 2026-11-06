@@ -101,14 +101,14 @@ service cloud.firestore {
       
       // Permit active profile billData
       match /profile/billData {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) && isEmailVerified();
         allow write: if isOwner(userId) && isEmailVerified() && isValidBillData(incoming());
       }
 
       // Permit history records
       match /history/{entryId} {
-        allow get: if isOwner(userId) && isValidId(entryId);
-        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isEmailVerified() && isValidId(entryId);
+        allow list: if isOwner(userId) && isEmailVerified();
         allow create: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming());
         allow update: if isOwner(userId) && isEmailVerified() && isValidId(entryId) && isValidHistoryEntry(incoming()) 
                       && incoming().id == existing().id; // prevent mutating id
@@ -117,8 +117,8 @@ service cloud.firestore {
 
       // Permit sources (parsed document files)
       match /sources/{sourceId} {
-        allow get: if isOwner(userId) && isValidId(sourceId);
-        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isEmailVerified() && isValidId(sourceId);
+        allow list: if isOwner(userId) && isEmailVerified();
         allow create: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming());
         allow update: if isOwner(userId) && isEmailVerified() && isValidId(sourceId) && isValidSourceFile(incoming())
                       && incoming().id == existing().id;
@@ -127,8 +127,8 @@ service cloud.firestore {
 
       // Permit chat history
       match /chats/{chatId} {
-        allow get: if isOwner(userId) && isValidId(chatId);
-        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isEmailVerified() && isValidId(chatId);
+        allow list: if isOwner(userId) && isEmailVerified();
         allow create: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming());
         allow update: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming())
                       && incoming().id == existing().id;

@@ -64,12 +64,12 @@ test('[ESTATICO] rutas servidor', () => {
 
 test('[ESTATICO] límite de cuerpo', () => {
   const serverTs = fs.readFileSync(path.join(rootDir, 'server.ts'), 'utf-8');
-  assert.ok(serverTs.includes('limit: "50mb"'));
+  assert.ok(serverTs.includes('limit: "10mb"'));
 });
 
 test('[ESTATICO] seguridad', () => {
   const serverTs = fs.readFileSync(path.join(rootDir, 'server.ts'), 'utf-8');
-  assert.equal(serverTs.includes('rateLimit'), false);
+  assert.equal(serverTs.includes('apiRateLimiter') || serverTs.includes('rateLimit'), true);
   assert.equal(serverTs.includes('requireAuth'), false);
 });
 

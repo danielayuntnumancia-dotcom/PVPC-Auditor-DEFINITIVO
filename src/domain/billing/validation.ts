@@ -97,8 +97,10 @@ export function validateBillData(data: BillData): BillingValidationResult {
           addError('fechaInicio', 'INVALID_DATE', 'La fecha inicial es inválida o no existe.');
       } else if (d2Obj.getUTCFullYear() !== y2 || d2Obj.getUTCMonth() !== m2 || d2Obj.getUTCDate() !== d2) {
           addError('fechaFin', 'INVALID_DATE', 'La fecha final es inválida o no existe.');
+      } else if (t2 < t1) {
+        addError('fechaFin', 'INVERTED_PERIOD', 'La fecha final no puede ser anterior a la inicial.');
       } else {
-        const dias = Math.floor((t2 - t1) / MILLISECONDS_PER_DAY) + 1;
+        const dias = Math.max(1, Math.floor((t2 - t1) / MILLISECONDS_PER_DAY));
         
         if (dias < LIMITS.DIAS.MIN) {
            addError('fechaFin', 'INVERTED_PERIOD', 'La fecha final no puede ser anterior a la inicial.');

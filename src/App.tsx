@@ -251,6 +251,12 @@ export default function App() {
       return;
     }
 
+    const editValidation = validateBillData(editBillData);
+    if (!editValidation.isValid) {
+      triggerAlert(editValidation.errors[0]?.message || "Por favor, corrige los errores en los datos de la factura antes de guardar.");
+      return;
+    }
+
     // Recalcular la factura para reflejar cualquier cambio en kW o kWh, precios, etc.
     const calculated = calcularFactura(editBillData);
 
@@ -336,6 +342,9 @@ export default function App() {
 
   const validationResult = validateBillData(billData);
   const isValid = validationResult.isValid;
+
+  const editValidationResult = editBillData ? validateBillData(editBillData) : { isValid: true, errors: [] };
+  const hasEditError = (fieldName: string) => editValidationResult.errors.some(e => e.field === fieldName);
 
   const [isBasicMode, setIsBasicMode] = useState<boolean>(false);
 
@@ -558,12 +567,18 @@ export default function App() {
       tipo: 'simulacion'
     };
     
+    const removedSimulations = history.filter(item => item.dateStr === todayStr && item.tipo === 'simulacion');
+
     setHistory(prev => {
       const filtered = prev.filter(item => item.dateStr !== todayStr || item.tipo !== 'simulacion');
       return [newEntry, ...filtered];
     });
 
     if (user && db) {
+      removedSimulations.forEach(old => {
+        deleteDoc(doc(db, 'users', user.uid, 'history', old.id))
+          .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/history/${old.id}`));
+      });
       setDoc(doc(db, 'users', user.uid, 'history', newEntry.id), newEntry)
         .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/history/${newEntry.id}`));
     }
@@ -640,6 +655,15 @@ export default function App() {
     setShowExportModal(false);
   };
 
+  const sanitizeCsvCell = (val: string | number): string => {
+    const str = String(val ?? '');
+    const neutralized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+    if (/[",\r\n]/.test(neutralized)) {
+      return `"${neutralized.replace(/"/g, '""')}"`;
+    }
+    return neutralized;
+  };
+
   const handleExportCSV = () => {
     const exportData = history.filter(h => selectedExportIds.includes(h.id));
     if (exportData.length === 0) return;
@@ -654,10 +678,10 @@ export default function App() {
     // Map data
     const rows = exportData.map(entry => {
       return [
-        entry.id,
-        entry.dateStr,
-        entry.tipo,
-        entry.mesFacturacion || '-',
+        sanitizeCsvCell(entry.id),
+        sanitizeCsvCell(entry.dateStr),
+        sanitizeCsvCell(entry.tipo),
+        sanitizeCsvCell(entry.mesFacturacion || '-'),
         entry.results.totalFactura.toFixed(2),
         entry.results.totalEnergia.toFixed(2),
         entry.results.totalPeajes.toFixed(2),
@@ -684,18 +708,44 @@ export default function App() {
         
         if (!Array.isArray(importedData)) throw new Error("Formato inválido");
         
+        const validItems: HistoryEntry[] = [];
+        for (const item of importedData) {
+          if (
+            item &&
+            typeof item.id === 'string' &&
+            /^[a-zA-Z0-9_-]{1,128}$/.test(item.id) &&
+            typeof item.dateStr === 'string' &&
+            item.dateStr.length <= 50 &&
+            typeof item.timestamp === 'number' &&
+            Number.isFinite(item.timestamp) &&
+            (item.tipo === 'simulacion' || item.tipo === 'oficial') &&
+            item.billData &&
+            typeof item.billData === 'object' &&
+            validateBillData(item.billData).isValid
+          ) {
+            validItems.push({
+              ...item,
+              results: calcularFactura(item.billData)
+            });
+          }
+        }
+
+        if (validItems.length === 0) {
+          throw new Error("Ningún registro válido en el backup");
+        }
+
         setHistory(prev => {
           const newHistory = [...prev];
-          let importedCount = 0;
-          importedData.forEach(item => {
+          const newlyAdded: HistoryEntry[] = [];
+          validItems.forEach(item => {
             if (!newHistory.find(h => h.id === item.id)) {
               newHistory.push(item);
-              importedCount++;
+              newlyAdded.push(item);
             }
           });
           
           if (user && db) {
-            importedData.forEach(item => {
+            newlyAdded.forEach(item => {
               setDoc(doc(db, 'users', user.uid, 'history', item.id), item)
                 .catch(err => console.error("Error syncing imported item to Firestore", err));
             });
@@ -2880,19 +2930,23 @@ export default function App() {
                     <label className="text-[11px] font-semibold text-slate-400">Fecha Inicio</label>
                     <input
                       type="date"
+                      aria-invalid={hasEditError("fechaInicio")}
                       value={editBillData.fechaInicio}
                       onChange={(e) => setEditBillData({ ...editBillData, fechaInicio: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
+                    {hasEditError("fechaInicio") && <div className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "fechaInicio")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Fecha Fin</label>
                     <input
                       type="date"
+                      aria-invalid={hasEditError("fechaFin")}
                       value={editBillData.fechaFin}
                       onChange={(e) => setEditBillData({ ...editBillData, fechaFin: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
+                    {hasEditError("fechaFin") && <div className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "fechaFin")?.message}</div>}
                   </div>
                 </div>
               </div>
@@ -2904,22 +2958,22 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Punta (P1) - kW</label>
                     <input
-                      type="number" aria-invalid={hasError("kwPunta")} aria-describedby="billing-error-kwPunta" min="0" max="100" step="0.1"
+                      type="number" aria-invalid={hasEditError("kwPunta")} aria-describedby="edit-billing-error-kwPunta" min="0" max="100" step="0.1"
                       value={editBillData.kwPunta}
                       onChange={(e) => setEditBillData({ ...editBillData, kwPunta: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("kwPunta") && <div id="billing-error-kwPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwPunta")?.message}</div>}
+{hasEditError("kwPunta") && <div id="edit-billing-error-kwPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "kwPunta")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Valle (P3) - kW</label>
                     <input
-                      type="number" aria-invalid={hasError("kwValle")} aria-describedby="billing-error-kwValle" min="0" max="100" step="0.1"
+                      type="number" aria-invalid={hasEditError("kwValle")} aria-describedby="edit-billing-error-kwValle" min="0" max="100" step="0.1"
                       value={editBillData.kwValle}
                       onChange={(e) => setEditBillData({ ...editBillData, kwValle: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("kwValle") && <div id="billing-error-kwValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwValle")?.message}</div>}
+{hasEditError("kwValle") && <div id="edit-billing-error-kwValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "kwValle")?.message}</div>}
                   </div>
                 </div>
               </div>
@@ -2938,12 +2992,12 @@ export default function App() {
                       </span>
                     </div>
                     <input
-                      type="number" aria-invalid={hasError("kwhPunta")} aria-describedby="billing-error-kwhPunta" min="0" max="999999" step="1"
+                      type="number" aria-invalid={hasEditError("kwhPunta")} aria-describedby="edit-billing-error-kwhPunta" min="0" max="999999" step="1"
                       value={editBillData.kwhPunta}
                       onChange={(e) => setEditBillData({ ...editBillData, kwhPunta: parseInt(e.target.value, 10) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("kwhPunta") && <div id="billing-error-kwhPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwhPunta")?.message}</div>}
+{hasEditError("kwhPunta") && <div id="edit-billing-error-kwhPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "kwhPunta")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
@@ -2955,12 +3009,12 @@ export default function App() {
                       </span>
                     </div>
                     <input
-                      type="number" aria-invalid={hasError("kwhLlano")} aria-describedby="billing-error-kwhLlano" min="0" max="999999" step="1"
+                      type="number" aria-invalid={hasEditError("kwhLlano")} aria-describedby="edit-billing-error-kwhLlano" min="0" max="999999" step="1"
                       value={editBillData.kwhLlano}
                       onChange={(e) => setEditBillData({ ...editBillData, kwhLlano: parseInt(e.target.value, 10) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("kwhLlano") && <div id="billing-error-kwhLlano" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwhLlano")?.message}</div>}
+{hasEditError("kwhLlano") && <div id="edit-billing-error-kwhLlano" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "kwhLlano")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
@@ -2972,12 +3026,12 @@ export default function App() {
                       </span>
                     </div>
                     <input
-                      type="number" aria-invalid={hasError("kwhValle")} aria-describedby="billing-error-kwhValle" min="0" max="999999" step="1"
+                      type="number" aria-invalid={hasEditError("kwhValle")} aria-describedby="edit-billing-error-kwhValle" min="0" max="999999" step="1"
                       value={editBillData.kwhValle}
                       onChange={(e) => setEditBillData({ ...editBillData, kwhValle: parseInt(e.target.value, 10) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("kwhValle") && <div id="billing-error-kwhValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "kwhValle")?.message}</div>}
+{hasEditError("kwhValle") && <div id="edit-billing-error-kwhValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "kwhValle")?.message}</div>}
                   </div>
                 </div>
               </div>
@@ -3002,46 +3056,60 @@ export default function App() {
                     <select
                       value={editIeeSelection}
                       onChange={e => {
-                        const val = e.target.value as 'standard' | 'custom';
+                        const val = e.target.value as 'standard' | 'mincomunitario' | 'custom';
                         setEditIeeSelection(val);
                         if (val === 'standard') {
-                          setEditBillData(p => p ? { ...p, iee: 5.11269632 } : null);
+                          setEditBillData(p => p ? { ...p, iee: 5.11269632, ieeMinComunitario: 0 } : null);
+                        } else if (val === 'mincomunitario') {
+                          setEditBillData(p => p ? { ...p, ieeMinComunitario: 0.001, iee: 0 } : null);
+                        } else {
+                          setEditBillData(p => p ? { ...p, ieeMinComunitario: 0 } : null);
                         }
                       }}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer mb-1.5"
                     >
                       <option value="standard">5,11269632%</option>
+                      <option value="mincomunitario">Mínimo</option>
                       <option value="custom">Personalizado</option>
                     </select>
                     <input
-                      type="number" aria-invalid={hasError("iee")} aria-describedby="billing-error-iee" min="0" max="100" step="0.01"
+                      type="number" min="0" max="1" step="0.0001"
+                      value={editBillData.ieeMinComunitario ?? 0.001}
+                      onChange={(e) => setEditBillData(p => p ? { ...p, ieeMinComunitario: parseFloat(e.target.value) || 0 } : null)}
+                      className={`w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono ${
+                        editIeeSelection === 'mincomunitario' ? 'block animate-in slide-in-from-top-1 duration-150' : 'hidden'
+                      }`}
+                      placeholder="0.001 €/kWh"
+                    />
+                    <input
+                      type="number" aria-invalid={hasEditError("iee")} aria-describedby="edit-billing-error-iee" min="0" max="100" step="0.01"
                       value={editBillData.iee}
                       onChange={(e) => setEditBillData(p => p ? { ...p, iee: parseFloat(e.target.value) || 0 } : null)}
                       className={`w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono ${
                         editIeeSelection === 'custom' ? 'block animate-in slide-in-from-top-1 duration-150' : 'hidden'
                       }`}
                     />
-{hasError("iee") && <div id="billing-error-iee" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "iee")?.message}</div>}
+{hasEditError("iee") && <div id="edit-billing-error-iee" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "iee")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Alq. Contador (€/día)</label>
                     <input
-                      type="number" aria-invalid={hasError("alqContador")} aria-describedby="billing-error-alqContador" min="0" max="5" step="0.000001"
+                      type="number" aria-invalid={hasEditError("alqContador")} aria-describedby="edit-billing-error-alqContador" min="0" max="5" step="0.000001"
                       value={editBillData.alqContador}
                       onChange={(e) => setEditBillData({ ...editBillData, alqContador: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("alqContador") && <div id="billing-error-alqContador" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "alqContador")?.message}</div>}
+{hasEditError("alqContador") && <div id="edit-billing-error-alqContador" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "alqContador")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Bono Social (€)</label>
                     <input
-                      type="number" aria-invalid={hasError("bonoSocial")} aria-describedby="billing-error-bonoSocial" min="-50" max="50" step="0.01"
+                      type="number" aria-invalid={hasEditError("bonoSocial")} aria-describedby="edit-billing-error-bonoSocial" min="-50" max="50" step="0.01"
                       value={editBillData.bonoSocial}
                       onChange={(e) => setEditBillData({ ...editBillData, bonoSocial: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("bonoSocial") && <div id="billing-error-bonoSocial" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "bonoSocial")?.message}</div>}
+{hasEditError("bonoSocial") && <div id="edit-billing-error-bonoSocial" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "bonoSocial")?.message}</div>}
                   </div>
                 </div>
               </div>
@@ -3053,7 +3121,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Precio Punta (P1)</label>
                     <input
-                      type="number" aria-invalid={hasError("costeEnergiaPunta")} aria-describedby="billing-error-costeEnergiaPunta" min="-1" max="5" step="0.000001"
+                      type="number" aria-invalid={hasEditError("costeEnergiaPunta")} aria-describedby="edit-billing-error-costeEnergiaPunta" min="-1" max="5" step="0.000001"
                       value={editBillData.costeEnergiaPunta ?? editBillData.costeEnergiaVariable}
                       onChange={(e) => setEditBillData({ 
                         ...editBillData, 
@@ -3062,37 +3130,37 @@ export default function App() {
                       })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("costeEnergiaPunta") && <div id="billing-error-costeEnergiaPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "costeEnergiaPunta")?.message}</div>}
+{hasEditError("costeEnergiaPunta") && <div id="edit-billing-error-costeEnergiaPunta" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "costeEnergiaPunta")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Precio Llano (P2)</label>
                     <input
-                      type="number" aria-invalid={hasError("costeEnergiaLlano")} aria-describedby="billing-error-costeEnergiaLlano" min="-1" max="5" step="0.000001"
+                      type="number" aria-invalid={hasEditError("costeEnergiaLlano")} aria-describedby="edit-billing-error-costeEnergiaLlano" min="-1" max="5" step="0.000001"
                       value={editBillData.costeEnergiaLlano ?? editBillData.costeEnergiaVariable}
                       onChange={(e) => setEditBillData({ ...editBillData, costeEnergiaLlano: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("costeEnergiaLlano") && <div id="billing-error-costeEnergiaLlano" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "costeEnergiaLlano")?.message}</div>}
+{hasEditError("costeEnergiaLlano") && <div id="edit-billing-error-costeEnergiaLlano" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "costeEnergiaLlano")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Precio Valle (P3)</label>
                     <input
-                      type="number" aria-invalid={hasError("costeEnergiaValle")} aria-describedby="billing-error-costeEnergiaValle" min="-1" max="5" step="0.000001"
+                      type="number" aria-invalid={hasEditError("costeEnergiaValle")} aria-describedby="edit-billing-error-costeEnergiaValle" min="-1" max="5" step="0.000001"
                       value={editBillData.costeEnergiaValle ?? editBillData.costeEnergiaVariable}
                       onChange={(e) => setEditBillData({ ...editBillData, costeEnergiaValle: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("costeEnergiaValle") && <div id="billing-error-costeEnergiaValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "costeEnergiaValle")?.message}</div>}
+{hasEditError("costeEnergiaValle") && <div id="edit-billing-error-costeEnergiaValle" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "costeEnergiaValle")?.message}</div>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-400">Presupuesto (€)</label>
                     <input
-                      type="number" aria-invalid={hasError("presupuesto")} aria-describedby="billing-error-presupuesto" min="0" max="99999" step="0.01"
+                      type="number" aria-invalid={hasEditError("presupuesto")} aria-describedby="edit-billing-error-presupuesto" min="0" max="99999" step="0.01"
                       value={editBillData.presupuesto}
                       onChange={(e) => setEditBillData({ ...editBillData, presupuesto: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
                     />
-{hasError("presupuesto") && <div id="billing-error-presupuesto" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "presupuesto")?.message}</div>}
+{hasEditError("presupuesto") && <div id="edit-billing-error-presupuesto" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{editValidationResult.errors.find(e => e.field === "presupuesto")?.message}</div>}
                   </div>
                 </div>
               </div>

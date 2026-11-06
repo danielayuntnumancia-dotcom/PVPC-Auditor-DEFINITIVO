@@ -12,10 +12,88 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: true }));
-// Support large image payloads for billing scanning
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+const ALLOWED_ORIGINS = new Set([
+  "https://gen-lang-client-0735328299.web.app",
+  "https://gen-lang-client-0735328299.firebaseapp.com",
+  "capacitor://localhost",
+  "https://localhost",
+  "http://localhost:3000",
+  "http://localhost:5173",
+]);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.has(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Origen no permitido por CORS"));
+    }
+  },
+}));
+// Limit payloads to 10mb to prevent memory exhaustion DoS while supporting bill scans
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// Basic in-memory rate limiting for API endpoints (max 60 requests / 15 min per IP)
+const apiRateLimiter = new Map<string, { count: number; resetAt: number }>();
+app.use("/api/", (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxRequests = 60;
+  const record = apiRateLimiter.get(ip);
+
+  if (!record || now > record.resetAt) {
+    apiRateLimiter.set(ip, { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+
+  if (record.count >= maxRequests) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Por favor, inténtalo de nuevo en unos minutos." });
+  }
+
+  record.count++;
+  next();
+});
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const ALLOWED_SCAN_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+]);
+
+function validateIsoDateRange(fechaInicio: unknown, fechaFin: unknown, maxDays = 366): { valid: boolean; error?: string; start?: Date; end?: Date } {
+  if (typeof fechaInicio !== "string" || typeof fechaFin !== "string" || !fechaInicio || !fechaFin) {
+    return { valid: false, error: "Faltan las fechas de inicio y fin." };
+  }
+  if (!ISO_DATE_REGEX.test(fechaInicio) || !ISO_DATE_REGEX.test(fechaFin)) {
+    return { valid: false, error: "Formato de fecha inválido. Usa YYYY-MM-DD." };
+  }
+  const start = new Date(`${fechaInicio}T00:00:00Z`);
+  const end = new Date(`${fechaFin}T00:00:00Z`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return { valid: false, error: "Las fechas proporcionadas no son válidas." };
+  }
+  if (end < start) {
+    return { valid: false, error: "La fecha final no puede ser anterior a la fecha inicial." };
+  }
+  const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+  if (diffDays > maxDays) {
+    return { valid: false, error: `El rango de fechas no puede superar los ${maxDays} días.` };
+  }
+  return { valid: true, start, end };
+}
 
 const PORT = 3000;
 
@@ -110,21 +188,19 @@ function getAiClient() {
 app.post("/api/audit/pvpc-public", async (req, res) => {
   try {
     const { fechaInicio, fechaFin } = req.body;
-    if (!fechaInicio || !fechaFin) {
-      return res.status(400).json({ error: "Faltan las fechas de inicio y fin." });
+    const rangeCheck = validateIsoDateRange(fechaInicio, fechaFin, 62);
+    if (!rangeCheck.valid || !rangeCheck.start || !rangeCheck.end) {
+      return res.status(400).json({ error: rangeCheck.error });
     }
 
     console.log(`[Public PVPC] Solicitando datos PVPC públicos para el periodo: ${fechaInicio} - ${fechaFin}`);
 
-    // Parse dates and get all dates in range
-    const start = new Date(fechaInicio);
-    const end = new Date(fechaFin);
+    // Parse dates and get all dates in range (capped at 62 days for daily archive endpoint)
     const dates: string[] = [];
-    
-    let current = new Date(start);
-    while (current <= end) {
+    const current = new Date(rangeCheck.start);
+    while (current <= rangeCheck.end) {
       dates.push(current.toISOString().split('T')[0]);
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     // Fetch data for each date in parallel
@@ -181,8 +257,9 @@ app.post("/api/audit/pvpc-public", async (req, res) => {
 app.post("/api/audit/esios-energy-costs", async (req, res) => {
   try {
     const { fechaInicio, fechaFin } = req.body;
-    if (!fechaInicio || !fechaFin) {
-      return res.status(400).json({ error: "Faltan las fechas de inicio y fin." });
+    const rangeCheck = validateIsoDateRange(fechaInicio, fechaFin, 366);
+    if (!rangeCheck.valid) {
+      return res.status(400).json({ error: rangeCheck.error });
     }
 
     console.log(`[ESIOS Energy Costs] Solicitando costes de energía variable para el periodo: ${fechaInicio} - ${fechaFin}`);
@@ -245,8 +322,9 @@ app.post("/api/audit/esios-energy-costs", async (req, res) => {
 app.post("/api/audit/pvpc", async (req, res) => {
   try {
     const { fechaInicio, fechaFin } = req.body;
-    if (!fechaInicio || !fechaFin) {
-      return res.status(400).json({ error: "Faltan las fechas de inicio y fin." });
+    const rangeCheck = validateIsoDateRange(fechaInicio, fechaFin, 366);
+    if (!rangeCheck.valid) {
+      return res.status(400).json({ error: rangeCheck.error });
     }
 
     console.log(`[PVPC Auditor] Solicitando precios de PVPC para el periodo: ${fechaInicio} - ${fechaFin}`);
@@ -372,7 +450,7 @@ Si los datos de ese período exacto no están disponibles porque el período est
 Devuelve los valores aproximados en euros por kWh (€/kWh) de forma estructurada en el JSON.`;
 
         const response = await getAiClient().models.generateContent({
-          model: "gemini-3.6-flash",
+          model: "gemini-2.5-flash",
           contents: prompt,
           config: {
             tools: [{ googleSearch: {} }],
@@ -551,7 +629,7 @@ Devuelve obligatoriamente un objeto JSON (y NADA más de texto fuera del bloque 
 Asegúrate de que la respuesta sea un JSON válido y legible.`;
 
     const response = await getAiClient().models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }]
@@ -721,17 +799,21 @@ Optando por esta tarifa en lugar de la opción más costosa analizada (**${highe
   }
 });
 
-// 1. Scan Electricity Bill (Image Analysis with gemini-3.1-pro-preview)
+// 1. Scan Electricity Bill (Image Analysis with Gemini)
 app.post("/api/audit/scan-bill", async (req, res) => {
   try {
     const { image, mimeType } = req.body;
-    if (!image) {
+    if (!image || typeof image !== "string") {
       return res.status(400).json({ error: "Falta la imagen de la factura." });
+    }
+    const resolvedMimeType = typeof mimeType === "string" && mimeType ? mimeType : "image/jpeg";
+    if (!ALLOWED_SCAN_MIME_TYPES.has(resolvedMimeType)) {
+      return res.status(400).json({ error: "Formato de archivo no soportado. Usa JPEG, PNG, WEBP o PDF." });
     }
 
     const imagePart = {
       inlineData: {
-        mimeType: mimeType || "image/jpeg",
+        mimeType: resolvedMimeType,
         data: image,
       },
     };
@@ -765,7 +847,7 @@ Reglas:
     let responseText = "";
     try {
       const response = await getAiClient().models.generateContent({
-        model: "gemini-3.6-flash", // Use gemini-3.6-flash for faster and reliable free-tier multi-modal analysis
+        model: "gemini-2.5-flash",
         contents: [imagePart, promptPart],
         config: {
           responseMimeType: "application/json",
@@ -800,10 +882,10 @@ Reglas:
       });
       responseText = response.text?.trim() || "";
     } catch (primaryError: any) {
-      console.warn("[PVPC Auditor] Error con gemini-3.6-flash al escanear, reintentando con gemini-3.6-flash:", primaryError);
+      console.warn("[PVPC Auditor] Error con gemini-2.5-flash al escanear, reintentando con gemini-2.0-flash:", primaryError);
       try {
         const fallbackResponse = await getAiClient().models.generateContent({
-          model: "gemini-3.6-flash", // Fallback lightweight model
+          model: "gemini-2.0-flash",
           contents: [imagePart, promptPart],
           config: {
             responseMimeType: "application/json",
@@ -920,7 +1002,7 @@ app.post("/api/gemini/chat", async (req, res) => {
   try {
     const { message, history, mode, billData, marketAnalysis, image, mimeType, sources, historyEntries } = req.body;
 
-    let modelName = "gemini-3.6-flash";
+    let modelName = "gemini-2.5-flash";
     const config: any = {};
 
     // Expert Spanish Energy Auditor System Instructions
@@ -1047,18 +1129,18 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
 
     // Apply configuration based on mode
     if (mode === "fast") {
-      modelName = "gemini-3.6-flash"; // Low-latency
+      modelName = "gemini-2.5-flash"; // Low-latency
     } else if (mode === "thinking") {
-      modelName = "gemini-3.6-flash"; // High thinking without free tier quota limitations
+      modelName = "gemini-2.5-flash"; // High thinking without free tier quota limitations
       config.thinkingConfig = {
         thinkingLevel: ThinkingLevel.HIGH,
       };
       // Do not set maxOutputTokens for thinking mode per guidelines
     } else if (mode === "grounded") {
-      modelName = "gemini-3.6-flash"; // Google Search grounded
+      modelName = "gemini-2.5-flash"; // Google Search grounded
       config.tools = [{ googleSearch: {} }];
     } else {
-      modelName = "gemini-3.6-flash"; // Normal
+      modelName = "gemini-2.5-flash"; // Normal
     }
 
     // Convert history for the @google/genai SDK format ensuring perfectly alternating roles
@@ -1120,7 +1202,7 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
         config,
       });
     } catch (apiError: any) {
-      console.warn("Error calling Gemini with standard/grounded configuration, retrying with lighter fallback model (gemini-3.6-flash):", apiError);
+      console.warn("Error calling Gemini with standard/grounded configuration, retrying with fallback configuration (gemini-2.5-flash):", apiError);
       fallbackUsed = true;
       try {
         const fallbackConfig = { ...config };
@@ -1128,19 +1210,19 @@ Si el usuario te pregunta sobre las ofertas disponibles en el comparador, tarifa
         delete fallbackConfig.thinkingConfig;
         
         response = await getAiClient().models.generateContent({
-          model: "gemini-3.6-flash",
+          model: "gemini-2.5-flash",
           contents,
           config: fallbackConfig,
         });
       } catch (liteError: any) {
-        console.warn("Error with gemini-3.6-flash, trying gemini-3.6-flash fallback:", liteError);
+        console.warn("Error with gemini-2.5-flash, trying gemini-2.0-flash fallback:", liteError);
         try {
           const fallbackConfig = { ...config };
           delete fallbackConfig.tools;
           delete fallbackConfig.thinkingConfig;
           
           response = await getAiClient().models.generateContent({
-            model: "gemini-3.6-flash",
+            model: "gemini-2.0-flash",
             contents,
             config: fallbackConfig,
           });
