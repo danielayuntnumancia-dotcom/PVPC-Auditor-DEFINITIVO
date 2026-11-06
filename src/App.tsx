@@ -806,11 +806,18 @@ export default function App() {
     
     const calculated = calcularFactura(billData);
     
+    const activeProfile = tariffProfiles.find(p => p.id === (billData.perfilTarifaId || 'pvpc-regulado'));
+    const billDataWithTariff: BillData = {
+      ...deepClone(billData),
+      perfilTarifaId: billData.perfilTarifaId || activeProfile?.id || 'pvpc-regulado',
+      nombreTarifa: billData.nombreTarifa || activeProfile?.nombre || 'PVPC 2.0TD (Mercado Regulado)'
+    };
+
     const newEntry: HistoryEntry = {
       id: `hist-${Date.now()}`,
       dateStr: todayStr,
       timestamp: Date.now(),
-      billData: deepClone(billData),
+      billData: billDataWithTariff,
       results: calculated,
       tipo: 'oficial',
       mesFacturacion: valorMes
@@ -2860,8 +2867,71 @@ export default function App() {
                   </div>
 
                   {/* Histórico Gráfico de Gasto y Consumo Mensual */}
-                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-md">
-                    <ComparisonChart officialBills={officialBills} />
+                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-md space-y-6">
+                    <ComparisonChart officialBills={officialBills} tariffProfiles={tariffProfiles} />
+
+                    {/* Desglose de Tarifa y Compañía por Mes Facturado */}
+                    <div className="border-t border-slate-800/80 pt-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                          Compañía y Tarifa Suministradora por Factura Oficial
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Pulsa en Editar para cambiar la tarifa asociada a un mes
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {officialBills.map((entry) => {
+                          const matchedProfile = tariffProfiles.find(p => p.id === entry.billData.perfilTarifaId);
+                          const tarifaLabel = entry.billData.nombreTarifa || matchedProfile?.nombre || 'PVPC 2.0TD (Mercado Regulado)';
+                          const companyLabel = matchedProfile?.comercializadora || (entry.billData.perfilTarifaId && entry.billData.perfilTarifaId !== 'pvpc-regulado' ? 'Mercado Libre' : 'Comercializadora Regulada');
+                          const isFreeMarket = (entry.billData.perfilTarifaId && entry.billData.perfilTarifaId !== 'pvpc-regulado') || (matchedProfile && matchedProfile.modalidad !== 'pvpc');
+                          const totalKwhEntry = entry.billData.kwhPunta + entry.billData.kwhLlano + entry.billData.kwhValle;
+                          return (
+                            <div
+                              key={entry.id}
+                              className="bg-slate-900/60 border border-slate-800/90 hover:border-slate-700 rounded-xl p-3.5 flex items-center justify-between gap-3 transition"
+                            >
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-white truncate">
+                                    {entry.mesFacturacion || entry.dateStr}
+                                  </span>
+                                  <span className="text-xs font-mono font-bold text-indigo-400">
+                                    {entry.results.totalFactura.toFixed(2)} €
+                                  </span>
+                                  <span className="text-[10px] font-mono text-emerald-400">
+                                    ({totalKwhEntry.toFixed(0)} kWh)
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                    isFreeMarket
+                                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                  }`}>
+                                    {tarifaLabel}
+                                  </span>
+                                  {companyLabel && (
+                                    <span className="text-[10px] text-slate-400 truncate">
+                                      • {companyLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleEditHistoryInit(entry)}
+                                title="Editar tarifa o datos de este mes"
+                                className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white rounded-lg transition shrink-0 cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Bento Grid de Averages */}
@@ -3204,6 +3274,43 @@ export default function App() {
                       />
                     </div>
                   )}
+
+                  {/* Perfil de Tarifa / Compañía Suministradora */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-[11px] font-semibold text-slate-400">Perfil de Tarifa Registrado</label>
+                    <select
+                      value={editBillData.perfilTarifaId || 'pvpc-regulado'}
+                      onChange={(e) => {
+                        const selectedProf = tariffProfiles.find(p => p.id === e.target.value);
+                        if (selectedProf) {
+                          setEditBillData({
+                            ...editBillData,
+                            perfilTarifaId: selectedProf.id,
+                            nombreTarifa: selectedProf.comercializadora
+                              ? `${selectedProf.nombre} (${selectedProf.comercializadora})`
+                              : selectedProf.nombre
+                          });
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      {tariffProfiles.map(prof => (
+                        <option key={prof.id} value={prof.id}>
+                          {prof.nombre} {prof.comercializadora ? `— ${prof.comercializadora}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400">Etiqueta Compañía / Tarifa</label>
+                    <input
+                      type="text"
+                      value={editBillData.nombreTarifa || ''}
+                      onChange={(e) => setEditBillData({ ...editBillData, nombreTarifa: e.target.value })}
+                      placeholder="Ej. Octopus Relax / PVPC"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
                 </div>
               </div>
 

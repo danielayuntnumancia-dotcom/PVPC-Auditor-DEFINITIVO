@@ -9,11 +9,12 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
-import { HistoryEntry } from "../types";
+import { HistoryEntry, TariffProfile } from "../types";
 import { Scale, Zap, Info } from "lucide-react";
 
 interface ComparisonChartProps {
   officialBills: HistoryEntry[];
+  tariffProfiles?: TariffProfile[];
 }
 
 function parseMesFacturacionInfo(mesFacturacion?: string) {
@@ -40,13 +41,16 @@ function parseMesFacturacionInfo(mesFacturacion?: string) {
   return { year, monthIndex };
 }
 
-export default function ComparisonChart({ officialBills }: ComparisonChartProps) {
+export default function ComparisonChart({ officialBills, tariffProfiles = [] }: ComparisonChartProps) {
   const chartData = [...officialBills]
     .map((entry) => {
       const info = parseMesFacturacionInfo(entry.mesFacturacion);
       const year = info.year || new Date(entry.timestamp).getFullYear() || 2026;
       const monthIndex = info.monthIndex !== -1 ? info.monthIndex : new Date(entry.timestamp).getMonth();
       const totalKwh = entry.billData.kwhPunta + entry.billData.kwhLlano + entry.billData.kwhValle;
+      const matchedProfile = tariffProfiles.find(p => p.id === entry.billData.perfilTarifaId);
+      const tarifaNombre = entry.billData.nombreTarifa || matchedProfile?.nombre || "PVPC 2.0TD (Regulado)";
+      const comercializadora = matchedProfile?.comercializadora || (entry.billData.perfilTarifaId && entry.billData.perfilTarifaId !== "pvpc-regulado" ? "Mercado Libre" : "Mercado Regulado");
       
       return {
         id: entry.id,
@@ -56,6 +60,8 @@ export default function ComparisonChart({ officialBills }: ComparisonChartProps)
         timestamp: entry.timestamp,
         coste: entry.results.totalFactura,
         consumo: totalKwh,
+        tarifaNombre,
+        comercializadora,
       };
     })
     .sort((a, b) => {
@@ -68,7 +74,7 @@ export default function ComparisonChart({ officialBills }: ComparisonChartProps)
       return a.timestamp - b.timestamp;
     });
 
-  type TooltipDataPoint = { name?: string; year?: number; [key: string]: unknown };
+  type TooltipDataPoint = { name?: string; year?: number; tarifaNombre?: string; comercializadora?: string; [key: string]: unknown };
   type TooltipPayload = { dataKey?: string; value?: number; payload?: TooltipDataPoint };
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) => {
     if (active && payload && payload.length) {
@@ -77,10 +83,20 @@ export default function ComparisonChart({ officialBills }: ComparisonChartProps)
       const dataPoint = payload[0]?.payload;
       
       return (
-        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl shadow-2xl space-y-2.5 max-w-[240px]">
+        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl shadow-2xl space-y-2.5 max-w-[260px]">
           <div className="border-b border-slate-800 pb-1.5">
             <p className="text-xs font-black text-white tracking-tight">{dataPoint?.name ?? ""}</p>
             <p className="text-[10px] text-slate-500 font-mono mt-0.5">Año {dataPoint?.year ?? "N/A"}</p>
+            <div className="mt-1.5 flex flex-col gap-0.5 bg-slate-900/80 border border-slate-800 px-2 py-1 rounded-lg">
+              <span className="text-[10px] font-bold text-amber-400 truncate">
+                {dataPoint?.tarifaNombre || "PVPC 2.0TD"}
+              </span>
+              {dataPoint?.comercializadora && (
+                <span className="text-[9px] text-slate-400 truncate">
+                  {dataPoint.comercializadora}
+                </span>
+              )}
+            </div>
           </div>
           <div className="space-y-1.5">
             {costeVal !== undefined && (
