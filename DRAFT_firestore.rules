@@ -95,6 +95,20 @@ service cloud.firestore {
         && msg.timestamp is string && msg.timestamp.size() <= 100;
     }
 
+    function isValidTariffProfile(profile) {
+      return profile.keys().hasAll(['id', 'nombre', 'comercializadora', 'modalidad', 'precioKwPunta', 'precioKwValle', 'costeEnergiaPunta', 'costeEnergiaLlano', 'costeEnergiaValle', 'timestamp'])
+        && isValidId(profile.id)
+        && profile.nombre is string && profile.nombre.size() >= 1 && profile.nombre.size() <= 120
+        && profile.comercializadora is string && profile.comercializadora.size() <= 120
+        && profile.modalidad is string && (profile.modalidad == 'pvpc' || profile.modalidad == 'fijo24h' || profile.modalidad == 'periodos3' || profile.modalidad == 'personalizado')
+        && profile.precioKwPunta is number && profile.precioKwPunta >= 0 && profile.precioKwPunta <= 500
+        && profile.precioKwValle is number && profile.precioKwValle >= 0 && profile.precioKwValle <= 500
+        && profile.costeEnergiaPunta is number && profile.costeEnergiaPunta >= 0 && profile.costeEnergiaPunta <= 5
+        && profile.costeEnergiaLlano is number && profile.costeEnergiaLlano >= 0 && profile.costeEnergiaLlano <= 5
+        && profile.costeEnergiaValle is number && profile.costeEnergiaValle >= 0 && profile.costeEnergiaValle <= 5
+        && profile.timestamp is number;
+    }
+
     // --- 4. SECURE PATH MATCHES ---
 
     match /users/{userId} {
@@ -133,6 +147,16 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isEmailVerified() && isValidId(chatId) && isValidChatMessage(incoming())
                       && incoming().id == existing().id;
         allow delete: if isOwner(userId) && isEmailVerified() && isValidId(chatId);
+      }
+
+      // Permit tariff profiles (Mercado Libre & PVPC)
+      match /tariffProfiles/{profileId} {
+        allow get: if isOwner(userId) && isEmailVerified() && isValidId(profileId);
+        allow list: if isOwner(userId) && isEmailVerified();
+        allow create: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming());
+        allow update: if isOwner(userId) && isEmailVerified() && isValidId(profileId) && isValidTariffProfile(incoming())
+                      && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isEmailVerified() && isValidId(profileId);
       }
     }
   }

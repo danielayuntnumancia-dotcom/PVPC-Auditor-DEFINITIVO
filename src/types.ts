@@ -1,5 +1,7 @@
 import type { BillData, BillResults } from './domain/billing';
 export type { BillData, BillResults };
+import type { TariffProfile, TariffModality } from './domain/billing';
+export type { TariffProfile, TariffModality };
 
 export interface SourceFile {
   id: string;

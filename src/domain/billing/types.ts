@@ -34,6 +34,39 @@ export interface BillData {
   iee: number; // % Impuesto Eléctrico (modo porcentaje)
   ieeMinComunitario?: number; // €/kWh tarifa mínimo comunitario (si se usa este modo)
   iva: number; // % IVA (10 o 21)
+
+  // Mercado Libre / Perfil de Tarifa (opcionales para compatibilidad total con PVPC)
+  perfilTarifaId?: string;
+  nombreTarifa?: string;
+  descuentoEnergia?: number; // % descuento sobre coste de energía (0-100)
+  serviciosAdicionales?: number; // € fijo en el periodo (mantenimiento, seguros, etc.)
+}
+
+export type TariffModality = 'pvpc' | 'fijo24h' | 'periodos3' | 'personalizado';
+
+export interface TariffProfile {
+  id: string;
+  nombre: string;
+  comercializadora: string;
+  modalidad: TariffModality;
+  unidadPotencia: 'anual' | 'diaria'; // €/kW/año o €/kW/día
+  precioKwPunta: number; // siempre almacenado en €/kW/año para el motor
+  precioKwValle: number; // siempre almacenado en €/kW/año para el motor
+  precioMargen: number;  // €/kW/año (0 si ya va incluido en potencia)
+  peajesIncluidos: boolean; // true en tarifas de mercado libre con precio final €/kWh
+  precioKwhPunta: number; // peaje P1 €/kWh (0 si peajesIncluidos)
+  precioKwhLlano: number; // peaje P2 €/kWh (0 si peajesIncluidos)
+  precioKwhValle: number; // peaje P3 €/kWh (0 si peajesIncluidos)
+  costeEnergiaPunta: number; // €/kWh P1 (o precio único 24h)
+  costeEnergiaLlano: number; // €/kWh P2 (o precio único 24h)
+  costeEnergiaValle: number; // €/kWh P3 (o precio único 24h)
+  descuentoEnergia: number; // % descuento sobre término de energía
+  serviciosAdicionales: number; // € fijos en la factura (mantenimiento/asistencia)
+  alqContador: number; // €/día
+  bonoSocial: number; // € fijo periodo
+  iee: number; // %
+  iva: number; // %
+  timestamp: number;
 }
 
 export interface BillResults {

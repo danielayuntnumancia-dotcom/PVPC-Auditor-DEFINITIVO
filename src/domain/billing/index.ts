@@ -1,4 +1,4 @@
-export type { BillData, BillResults } from './types';
+export type { BillData, BillResults, TariffProfile, TariffModality } from './types';
 export { DEFAULT_PVPC_VALUES } from './defaults';
 export { calcularFactura } from './calculateBill';
 export * from './constants';

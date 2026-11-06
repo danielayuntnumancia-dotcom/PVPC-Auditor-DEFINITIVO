@@ -24,9 +24,11 @@ import {
   BarChart2,
   Edit3,
   Paperclip,
-  Image
+  Image,
+  Plus,
+  Settings
 } from 'lucide-react';
-import { BillData, BillResults, SourceFile, ChatMessage, HistoryEntry, MarketAnalysisData, MarketOffer } from './types';
+import { BillData, BillResults, SourceFile, ChatMessage, HistoryEntry, MarketAnalysisData, MarketOffer, TariffProfile, TariffModality } from './types';
 import { calcularFactura, DEFAULT_PVPC_VALUES, formatDate, validateBillData, safeParse, deepClone, downloadFile, getApiUrl } from './utils';
 import BillChart from './components/BillChart';
 import ComparisonChart from './components/ComparisonChart';
@@ -228,6 +230,175 @@ export default function App() {
   // Backup and Export State
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>([]);
+
+  // --- PERFILES DE TARIFA (MERCADO LIBRE / PVPC) ---
+  const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
+    {
+      id: 'pvpc-regulado',
+      nombre: 'PVPC 2.0TD (Mercado Regulado)',
+      comercializadora: 'Comercializadora de Referencia',
+      modalidad: 'pvpc',
+      unidadPotencia: 'anual',
+      precioKwPunta: DEFAULT_PVPC_VALUES.precioKwPunta,
+      precioKwValle: DEFAULT_PVPC_VALUES.precioKwValle,
+      precioMargen: DEFAULT_PVPC_VALUES.precioMargen,
+      peajesIncluidos: false,
+      precioKwhPunta: DEFAULT_PVPC_VALUES.precioKwhPunta,
+      precioKwhLlano: DEFAULT_PVPC_VALUES.precioKwhLlano,
+      precioKwhValle: DEFAULT_PVPC_VALUES.precioKwhValle,
+      costeEnergiaPunta: DEFAULT_PVPC_VALUES.costeEnergiaPunta,
+      costeEnergiaLlano: DEFAULT_PVPC_VALUES.costeEnergiaLlano,
+      costeEnergiaValle: DEFAULT_PVPC_VALUES.costeEnergiaValle,
+      descuentoEnergia: 0,
+      serviciosAdicionales: 0,
+      alqContador: DEFAULT_PVPC_VALUES.alqContador,
+      bonoSocial: DEFAULT_PVPC_VALUES.bonoSocial,
+      iee: DEFAULT_PVPC_VALUES.iee,
+      iva: DEFAULT_PVPC_VALUES.iva,
+      timestamp: 0
+    }
+  ];
+
+  const [tariffProfiles, setTariffProfiles] = useState<TariffProfile[]>(() => {
+    const saved = safeParse<TariffProfile[] | null>(localStorage.getItem('pvpc_tariff_profiles'), null);
+    return saved && saved.length > 0 ? saved : DEFAULT_TARIFF_PROFILES;
+  });
+  const [showTariffModal, setShowTariffModal] = useState<boolean>(false);
+  const [editingTariff, setEditingTariff] = useState<TariffProfile | null>(null);
+  const [tariffInputUnitPotencia, setTariffInputUnitPotencia] = useState<'anual' | 'diaria'>('diaria');
+  const [tariffRawKwPunta, setTariffRawKwPunta] = useState<number>(0.089);
+  const [tariffRawKwValle, setTariffRawKwValle] = useState<number>(0.029);
+
+  const handleOpenNewTariffProfile = () => {
+    const defaultKwPuntaDia = Number((billData.precioKwPunta / 365).toFixed(6));
+    const defaultKwValleDia = Number((billData.precioKwValle / 365).toFixed(6));
+    setTariffInputUnitPotencia('diaria');
+    setTariffRawKwPunta(defaultKwPuntaDia);
+    setTariffRawKwValle(defaultKwValleDia);
+    setEditingTariff({
+      id: `tarifa-${Date.now()}`,
+      nombre: 'Mi Tarifa Mercado Libre',
+      comercializadora: '',
+      modalidad: 'fijo24h',
+      unidadPotencia: 'diaria',
+      precioKwPunta: Number((defaultKwPuntaDia * 365).toFixed(6)),
+      precioKwValle: Number((defaultKwValleDia * 365).toFixed(6)),
+      precioMargen: 0,
+      peajesIncluidos: true,
+      precioKwhPunta: 0,
+      precioKwhLlano: 0,
+      precioKwhValle: 0,
+      costeEnergiaPunta: 0.125,
+      costeEnergiaLlano: 0.125,
+      costeEnergiaValle: 0.125,
+      descuentoEnergia: 0,
+      serviciosAdicionales: 0,
+      alqContador: billData.alqContador,
+      bonoSocial: 0,
+      iee: billData.iee,
+      iva: billData.iva,
+      timestamp: Date.now()
+    });
+    setShowTariffModal(true);
+  };
+
+  const handleOpenEditTariffProfile = (profile: TariffProfile) => {
+    const unit = profile.unidadPotencia || 'diaria';
+    setTariffInputUnitPotencia(unit);
+    setTariffRawKwPunta(unit === 'diaria' ? Number((profile.precioKwPunta / 365).toFixed(6)) : profile.precioKwPunta);
+    setTariffRawKwValle(unit === 'diaria' ? Number((profile.precioKwValle / 365).toFixed(6)) : profile.precioKwValle);
+    setEditingTariff(deepClone(profile));
+    setShowTariffModal(true);
+  };
+
+  const handleApplyTariffProfile = (profile: TariffProfile) => {
+    setBillData(prev => ({
+      ...prev,
+      perfilTarifaId: profile.id,
+      nombreTarifa: profile.nombre,
+      precioKwPunta: profile.precioKwPunta,
+      precioKwValle: profile.precioKwValle,
+      precioMargen: profile.precioMargen,
+      precioKwhPunta: profile.peajesIncluidos ? 0 : profile.precioKwhPunta,
+      precioKwhLlano: profile.peajesIncluidos ? 0 : profile.precioKwhLlano,
+      precioKwhValle: profile.peajesIncluidos ? 0 : profile.precioKwhValle,
+      costeEnergiaPunta: profile.costeEnergiaPunta,
+      costeEnergiaLlano: profile.modalidad === 'fijo24h' ? profile.costeEnergiaPunta : profile.costeEnergiaLlano,
+      costeEnergiaValle: profile.modalidad === 'fijo24h' ? profile.costeEnergiaPunta : profile.costeEnergiaValle,
+      costeEnergiaVariable: profile.costeEnergiaPunta,
+      descuentoEnergia: profile.descuentoEnergia || 0,
+      serviciosAdicionales: profile.serviciosAdicionales || 0,
+      alqContador: profile.alqContador,
+      bonoSocial: profile.bonoSocial,
+      iee: profile.iee,
+      iva: profile.iva
+    }));
+  };
+
+  const handleSaveTariffProfile = () => {
+    if (!editingTariff) return;
+    if (!editingTariff.nombre.trim()) {
+      triggerAlert("Por favor, introduce un nombre para el perfil de tarifa.");
+      return;
+    }
+
+    const annualKwPunta = tariffInputUnitPotencia === 'diaria'
+      ? Number((tariffRawKwPunta * 365).toFixed(6))
+      : Number(tariffRawKwPunta);
+    const annualKwValle = tariffInputUnitPotencia === 'diaria'
+      ? Number((tariffRawKwValle * 365).toFixed(6))
+      : Number(tariffRawKwValle);
+
+    const finalProfile: TariffProfile = {
+      ...editingTariff,
+      nombre: editingTariff.nombre.trim(),
+      comercializadora: editingTariff.comercializadora.trim(),
+      unidadPotencia: tariffInputUnitPotencia,
+      precioKwPunta: annualKwPunta,
+      precioKwValle: annualKwValle,
+      precioKwhPunta: editingTariff.peajesIncluidos ? 0 : editingTariff.precioKwhPunta,
+      precioKwhLlano: editingTariff.peajesIncluidos ? 0 : editingTariff.precioKwhLlano,
+      precioKwhValle: editingTariff.peajesIncluidos ? 0 : editingTariff.precioKwhValle,
+      costeEnergiaLlano: editingTariff.modalidad === 'fijo24h' ? editingTariff.costeEnergiaPunta : editingTariff.costeEnergiaLlano,
+      costeEnergiaValle: editingTariff.modalidad === 'fijo24h' ? editingTariff.costeEnergiaPunta : editingTariff.costeEnergiaValle,
+      timestamp: Date.now()
+    };
+
+    setTariffProfiles(prev => {
+      const exists = prev.some(p => p.id === finalProfile.id);
+      return exists ? prev.map(p => p.id === finalProfile.id ? finalProfile : p) : [...prev, finalProfile];
+    });
+
+    if (user && db) {
+      setDoc(doc(db, 'users', user.uid, 'tariffProfiles', finalProfile.id), finalProfile)
+        .catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/tariffProfiles/${finalProfile.id}`));
+    }
+
+    handleApplyTariffProfile(finalProfile);
+    setShowTariffModal(false);
+    setEditingTariff(null);
+  };
+
+  const handleDeleteTariffProfile = (profileId: string) => {
+    if (profileId === 'pvpc-regulado') {
+      triggerAlert("El perfil base PVPC Regulado no se puede eliminar.");
+      return;
+    }
+    triggerConfirm(
+      'Eliminar Perfil de Tarifa',
+      '¿Seguro que deseas eliminar este perfil de tarifa?',
+      () => {
+        setTariffProfiles(prev => prev.filter(p => p.id !== profileId));
+        if (billData.perfilTarifaId === profileId) {
+          handleApplyTariffProfile(DEFAULT_TARIFF_PROFILES[0]);
+        }
+        if (user && db) {
+          deleteDoc(doc(db, 'users', user.uid, 'tariffProfiles', profileId))
+            .catch(err => handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/tariffProfiles/${profileId}`));
+        }
+      }
+    );
+  };
 
   const handleEditHistoryInit = (entry: HistoryEntry) => {
     setEditingEntryId(entry.id);
@@ -486,6 +657,21 @@ export default function App() {
               await setDoc(doc(db, 'users', firebaseUser.uid, 'chats', item.id), item);
             }
           }
+
+          // 5. Fetch tariffProfiles
+          const profilesSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'tariffProfiles'));
+          if (!profilesSnap.empty) {
+            const pList: TariffProfile[] = [];
+            profilesSnap.forEach(d => pList.push(d.data() as TariffProfile));
+            if (!pList.some(p => p.id === 'pvpc-regulado')) {
+              pList.unshift(DEFAULT_TARIFF_PROFILES[0]);
+            }
+            setTariffProfiles(pList);
+          } else if (tariffProfiles.length > 0) {
+            for (const item of tariffProfiles) {
+              await setDoc(doc(db, 'users', firebaseUser.uid, 'tariffProfiles', item.id), item);
+            }
+          }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("Error doing initial sync with Firestore:", msg);
@@ -541,6 +727,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('pvpc_history', JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem('pvpc_tariff_profiles', JSON.stringify(tariffProfiles));
+  }, [tariffProfiles]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1618,6 +1808,69 @@ export default function App() {
               </div>
             </div>
 
+            {/* Barra de Perfiles de Tarifa (Mercado Libre / PVPC) */}
+            <div className="bg-slate-950/90 p-4 rounded-2xl border border-indigo-500/30 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-indigo-400 shrink-0">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Perfil de Tarifa Activo</span>
+                    {billData.nombreTarifa && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        {billData.nombreTarifa}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Selecciona tu contrato de <strong className="text-slate-200">Mercado Libre</strong> (Precio Fijo 24h, 3 Periodos o Personalizado) o vuelve a <strong className="text-slate-200">PVPC Regulado</strong> con un clic.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <select
+                  aria-label="Seleccionar perfil de tarifa"
+                  value={billData.perfilTarifaId || 'pvpc-regulado'}
+                  onChange={(e) => {
+                    const found = tariffProfiles.find(p => p.id === e.target.value);
+                    if (found) handleApplyTariffProfile(found);
+                  }}
+                  className="bg-slate-900 border border-slate-700 hover:border-indigo-500/60 rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  {tariffProfiles.map(profile => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.nombre} {profile.comercializadora ? `(${profile.comercializadora})` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {(() => {
+                  const currentProfile = tariffProfiles.find(p => p.id === (billData.perfilTarifaId || 'pvpc-regulado'));
+                  return currentProfile ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditTariffProfile(currentProfile)}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Editar Condiciones</span>
+                    </button>
+                  ) : null;
+                })()}
+
+                <button
+                  type="button"
+                  onClick={handleOpenNewTariffProfile}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-950/30 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nuevo Perfil Mercado Libre</span>
+                </button>
+              </div>
+            </div>
+
             {/* Error de validación destacado */}
             {!isValid && validationResult.errors.length > 0 && (
               <div className="bg-rose-950/40 border border-rose-900/50 p-4 rounded-xl flex items-start gap-3">
@@ -1749,6 +2002,24 @@ export default function App() {
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                       />
 {hasError("bonoSocial") && <div id="billing-error-bonoSocial" className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-500/10 px-2 py-1 rounded">{validationResult.errors.find(e => e.field === "bonoSocial")?.message}</div>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Dto. Energía (%)</label>
+                      <input 
+                        type="number" min="0" max="100" step="0.5" 
+                        value={billData.descuentoEnergia ?? 0} 
+                        onChange={e => setBillData(p => ({...p, descuentoEnergia: Math.max(0, Math.min(100, Number(e.target.value) || 0))}))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Servicios / Mant. (€)</label>
+                      <input 
+                        type="number" min="0" max="500" step="0.01" 
+                        value={billData.serviciosAdicionales ?? 0} 
+                        onChange={e => setBillData(p => ({...p, serviciosAdicionales: Math.max(0, Number(e.target.value) || 0)}))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      />
                     </div>
                   </div>
 
@@ -3273,6 +3544,298 @@ export default function App() {
               >
                 <Save className="w-4 h-4" /> Descargar Backup JSON
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Creación / Edición de Perfil de Tarifa (Mercado Libre / PVPC) */}
+      {showTariffModal && editingTariff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowTariffModal(false)} />
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-600/20 border border-indigo-500/40 rounded-xl text-indigo-400">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Condiciones del Perfil de Tarifa</h3>
+                  <p className="text-[11px] text-slate-400">Configura los precios de tu contrato de Mercado Libre o tarifa personalizada</p>
+                </div>
+              </div>
+              <button onClick={() => setShowTariffModal(false)} className="text-slate-400 hover:text-white transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* 1. Identificación y Modalidad */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nombre del Perfil</label>
+                  <input
+                    type="text"
+                    value={editingTariff.nombre}
+                    onChange={e => setEditingTariff({ ...editingTariff, nombre: e.target.value })}
+                    placeholder="Ej. Tarifa Fija 24h"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Comercializadora</label>
+                  <input
+                    type="text"
+                    value={editingTariff.comercializadora}
+                    onChange={e => setEditingTariff({ ...editingTariff, comercializadora: e.target.value })}
+                    placeholder="Ej. Iberdrola, Endesa, Octopus..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Modalidad de Tarifa</label>
+                  <select
+                    value={editingTariff.modalidad}
+                    onChange={e => {
+                      const mod = e.target.value as TariffModality;
+                      setEditingTariff(prev => prev ? ({
+                        ...prev,
+                        modalidad: mod,
+                        peajesIncluidos: mod !== 'pvpc',
+                        precioMargen: mod === 'pvpc' ? DEFAULT_PVPC_VALUES.precioMargen : 0,
+                        costeEnergiaLlano: mod === 'fijo24h' ? prev.costeEnergiaPunta : prev.costeEnergiaLlano,
+                        costeEnergiaValle: mod === 'fijo24h' ? prev.costeEnergiaPunta : prev.costeEnergiaValle
+                      }) : null);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="fijo24h">Mercado Libre — Precio Fijo 24h (1 precio)</option>
+                    <option value="periodos3">Mercado Libre — 3 Periodos (Punta/Llano/Valle)</option>
+                    <option value="personalizado">Mercado Libre — Indexada / Con Peajes Separados</option>
+                    <option value="pvpc">Mercado Regulado — PVPC 2.0TD</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 2. Condiciones de Potencia */}
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Precios de Potencia Contratada</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400">Unidad en tu contrato:</span>
+                    <select
+                      value={tariffInputUnitPotencia}
+                      onChange={e => {
+                        const newUnit = e.target.value as 'diaria' | 'anual';
+                        if (newUnit !== tariffInputUnitPotencia) {
+                          if (newUnit === 'diaria') {
+                            setTariffRawKwPunta(Number((tariffRawKwPunta / 365).toFixed(6)));
+                            setTariffRawKwValle(Number((tariffRawKwValle / 365).toFixed(6)));
+                          } else {
+                            setTariffRawKwPunta(Number((tariffRawKwPunta * 365).toFixed(4)));
+                            setTariffRawKwValle(Number((tariffRawKwValle * 365).toFixed(4)));
+                          }
+                          setTariffInputUnitPotencia(newUnit);
+                        }
+                      }}
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-white font-semibold cursor-pointer"
+                    >
+                      <option value="diaria">€/kW/día (habitual Mercado Libre)</option>
+                      <option value="anual">€/kW/año (anual)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Potencia Punta P1 ({tariffInputUnitPotencia === 'diaria' ? '€/kW/día' : '€/kW/año'})
+                    </label>
+                    <input
+                      type="number" min="0" step="0.000001"
+                      value={tariffRawKwPunta}
+                      onChange={e => setTariffRawKwPunta(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Potencia Valle P2/P3 ({tariffInputUnitPotencia === 'diaria' ? '€/kW/día' : '€/kW/año'})
+                    </label>
+                    <input
+                      type="number" min="0" step="0.000001"
+                      value={tariffRawKwValle}
+                      onChange={e => setTariffRawKwValle(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Margen Fijo Comercializadora (€/kW/año)</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={editingTariff.precioMargen}
+                      onChange={e => setEditingTariff({ ...editingTariff, precioMargen: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                    <span className="text-[10px] text-slate-500">En mercado libre suele ser 0 (incluido en P1/P2)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Condiciones de Energía (€/kWh) */}
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Precios del Consumo de Energía (€/kWh)</span>
+                  <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingTariff.peajesIncluidos}
+                      onChange={e => setEditingTariff({
+                        ...editingTariff,
+                        peajesIncluidos: e.target.checked,
+                        precioKwhPunta: e.target.checked ? 0 : DEFAULT_PVPC_VALUES.precioKwhPunta,
+                        precioKwhLlano: e.target.checked ? 0 : DEFAULT_PVPC_VALUES.precioKwhLlano,
+                        precioKwhValle: e.target.checked ? 0 : DEFAULT_PVPC_VALUES.precioKwhValle
+                      })}
+                      className="rounded border-slate-700 bg-slate-900 text-emerald-500"
+                    />
+                    <span>El precio €/kWh ya incluye peajes y cargos (estándar en Mercado Libre)</span>
+                  </label>
+                </div>
+
+                {editingTariff.modalidad === 'fijo24h' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-emerald-300 mb-1">Precio Único 24h (€/kWh sin impuestos)</label>
+                      <input
+                        type="number" min="0" max="5" step="0.000001"
+                        value={editingTariff.costeEnergiaPunta}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setEditingTariff({
+                            ...editingTariff,
+                            costeEnergiaPunta: val,
+                            costeEnergiaLlano: val,
+                            costeEnergiaValle: val
+                          });
+                        }}
+                        className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      />
+                      <span className="text-[10px] text-slate-400">Se aplicará por igual a todos los kWh consumidos en P1, P2 y P3.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Precio Energía Punta P1 (€/kWh)</label>
+                      <input
+                        type="number" min="0" max="5" step="0.000001"
+                        value={editingTariff.costeEnergiaPunta}
+                        onChange={e => setEditingTariff({ ...editingTariff, costeEnergiaPunta: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Precio Energía Llano P2 (€/kWh)</label>
+                      <input
+                        type="number" min="0" max="5" step="0.000001"
+                        value={editingTariff.costeEnergiaLlano}
+                        onChange={e => setEditingTariff({ ...editingTariff, costeEnergiaLlano: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Precio Energía Valle P3 (€/kWh)</label>
+                      <input
+                        type="number" min="0" max="5" step="0.000001"
+                        value={editingTariff.costeEnergiaValle}
+                        onChange={e => setEditingTariff({ ...editingTariff, costeEnergiaValle: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Descuentos y Servicios Adicionales del Contrato */}
+              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 block border-b border-slate-800 pb-2">
+                  Descuentos Comerciales y Otros Conceptos
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Descuento en Energía (%)</label>
+                    <input
+                      type="number" min="0" max="100" step="0.5"
+                      value={editingTariff.descuentoEnergia}
+                      onChange={e => setEditingTariff({ ...editingTariff, descuentoEnergia: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Servicios / Mant. (€)</label>
+                    <input
+                      type="number" min="0" max="500" step="0.01"
+                      value={editingTariff.serviciosAdicionales}
+                      onChange={e => setEditingTariff({ ...editingTariff, serviciosAdicionales: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Alq. Contador (€/día)</label>
+                    <input
+                      type="number" min="0" max="5" step="0.000001"
+                      value={editingTariff.alqContador}
+                      onChange={e => setEditingTariff({ ...editingTariff, alqContador: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Bono Social / Fin. (€)</label>
+                    <input
+                      type="number" min="-50" max="50" step="0.01"
+                      value={editingTariff.bonoSocial}
+                      onChange={e => setEditingTariff({ ...editingTariff, bonoSocial: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-950/70 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                {editingTariff.id !== 'pvpc-regulado' && tariffProfiles.some(p => p.id === editingTariff.id) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTariffModal(false);
+                      handleDeleteTariffProfile(editingTariff.id);
+                    }}
+                    className="px-3.5 py-2 bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Perfil</span>
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowTariffModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveTariffProfile}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-950/40 transition cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Guardar y Aplicar a la Calculadora</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

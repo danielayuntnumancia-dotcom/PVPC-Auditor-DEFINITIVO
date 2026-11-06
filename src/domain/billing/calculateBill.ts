@@ -65,9 +65,13 @@ export function calcularFactura(data: BillData): BillResults {
       ? new Decimal(data.costeEnergiaValle) 
       : new Decimal(0);
 
-  const costeEnergiaPuntaTotal = dKwhPunta.mul(dCosteEnergiaPunta);
-  const costeEnergiaLlanoTotal = dKwhLlano.mul(dCosteEnergiaLlano);
-  const costeEnergiaValleTotal = dKwhValle.mul(dCosteEnergiaValle);
+  const factorDescuento = data.descuentoEnergia && data.descuentoEnergia > 0
+    ? new Decimal(1).minus(Decimal.min(new Decimal(data.descuentoEnergia), new Decimal(100)).div(100))
+    : new Decimal(1);
+
+  const costeEnergiaPuntaTotal = dKwhPunta.mul(dCosteEnergiaPunta).mul(factorDescuento);
+  const costeEnergiaLlanoTotal = dKwhLlano.mul(dCosteEnergiaLlano).mul(factorDescuento);
+  const costeEnergiaValleTotal = dKwhValle.mul(dCosteEnergiaValle).mul(factorDescuento);
   const costeEnergia = costeEnergiaPuntaTotal.plus(costeEnergiaLlanoTotal).plus(costeEnergiaValleTotal);
                        
   const totalVariable = costePeajes.plus(costeEnergia);
@@ -85,10 +89,13 @@ export function calcularFactura(data: BillData): BillResults {
     totalIee = baseElectrica.mul(dIee);
   }
 
-  // 4. Conceptos Regulados
+  // 4. Conceptos Regulados y Servicios Adicionales
   const dBonoSocial = new Decimal(data.bonoSocial);
   const dAlqContador = new Decimal(data.alqContador);
-  const totalRegulados = dBonoSocial.plus(dAlqContador.mul(dDias));
+  const dServiciosAdicionales = data.serviciosAdicionales && data.serviciosAdicionales > 0
+    ? new Decimal(data.serviciosAdicionales)
+    : new Decimal(0);
+  const totalRegulados = dBonoSocial.plus(dAlqContador.mul(dDias)).plus(dServiciosAdicionales);
 
   // 5. IVA aplicado sobre la Base Imponible Completa
   const baseImponible = baseElectrica.plus(totalIee).plus(totalRegulados);
