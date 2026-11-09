@@ -1,7 +1,7 @@
 {
   "name": "react-example",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -15,7 +15,8 @@
     "test": "npm run test:characterization",
     "test:characterization": "tsx --test tests/characterization/*.test.ts",
     "test:security": "tsx --test tests/security/api.test.ts",
-    "test:rules": "firebase emulators:exec --config firebase.security-tests.json --project demo-pvpc-security --only firestore \"tsx --test tests/security/firestore.test.ts\""
+    "test:rules": "firebase emulators:exec --config firebase.security-tests.json --project demo-pvpc-security --only firestore \"tsx --test tests/security/firestore.test.ts\"",
+    "icons:generate": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
@@ -40,6 +41,7 @@
     "@capacitor/cli": "^8.5.0",
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@firebase/rules-unit-testing": "^5.0.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.17",

@@ -1,9 +1,9 @@
-# PVPC Auditor 1.1.1
+# PVPC Auditor 1.1.2
 
 Aplicación React y TypeScript para calcular facturas, gestionar perfiles de tarifa y consultar el historial y la comparación local. Incluye una aplicación Android firmada.
 
 - [Abrir aplicación web](https://gen-lang-client-0735328299.web.app/)
-- [Descargar APK 1.1.1](https://github.com/danielayuntnumancia-dotcom/PVPC-Auditor-DEFINITIVO/releases/download/v1.1.1/PVPC-Auditor-1.1.1.apk)
+- [Descargar APK 1.1.2](https://github.com/danielayuntnumancia-dotcom/PVPC-Auditor-DEFINITIVO/releases/download/v1.1.2/PVPC-Auditor-1.1.2.apk)
 - [Versiones y archivos de instalación](https://github.com/danielayuntnumancia-dotcom/PVPC-Auditor-DEFINITIVO/releases)
 
 ## Desarrollo local
@@ -49,12 +49,14 @@ Los hooks de Firebase compilan la web y Functions antes de publicar.
 
 ## Android
 
-La versión 1.1.1 incorpora el diseño móvil ajustado y navegación atrás: pantalla anterior o Calculadora, cierre de diálogos y doble atrás en dos segundos para salir desde Calculadora. La actualización conserva el paquete y la firma anteriores.
+La versión 1.1.2 unifica el icono web y Android con el rayo blanco sobre fondo verde y conserva el diseño móvil ajustado y navegación atrás: pantalla anterior o Calculadora, cierre de diálogos y doble atrás en dos segundos para salir desde Calculadora. La actualización conserva el paquete y la firma anteriores.
 
 Consultar [compilación y firma de Android](ANDROID_RELEASE.md). Los APK se distribuyen como archivos de GitHub Releases. La clave privada, las credenciales de firma, los backups y los logs locales quedan fuera del código publicado.
 
+El original vectorial y el comando para regenerar los iconos están en [assets/branding](assets/branding/README.md).
+
 ## Documentación
 
-[Auditoría de seguridad](SECURITY_AUDIT_2026-11-06.md), [limpieza y recuperación](CLEANUP_RESULT_2026-11-06.md) y [despliegue](DEPLOYMENT_RESULT_2026-11-06.md).
+[Auditoría de seguridad](SECURITY_AUDIT_2026-11-06.md), [limpieza y recuperación](CLEANUP_RESULT_2026-11-06.md), [publicación de iconos 1.1.2](DEPLOYMENT_RESULT_2026-11-09.md) y [despliegue anterior](DEPLOYMENT_RESULT_2026-11-06.md).
 
 Los documentos marcados como históricos describen versiones anteriores. Las funciones de IA desconectadas que permanecen en `App.tsx` y sus endpoints requieren una decisión aparte antes de retirarlos.

@@ -1469,7 +1469,7 @@ export default function App() {
           <Zap className="w-5 h-5 text-emerald-400 fill-current" />
           <div className="flex flex-col">
             <span className="font-bold text-sm tracking-tight text-white leading-none">PVPC AUDITOR</span>
-            <span className="text-[8px] text-slate-500 font-mono">v1.1.1</span>
+            <span className="text-[8px] text-slate-500 font-mono">v1.1.2</span>
           </div>
         </div>
         
@@ -1758,7 +1758,7 @@ export default function App() {
             </div>
           )}
           
-          <p className="text-[10px] text-slate-500 font-mono text-center">v1.1.1 • Tarifa PVPC 2.0TD</p>
+          <p className="text-[10px] text-slate-500 font-mono text-center">v1.1.2 • Tarifa PVPC 2.0TD</p>
         </div>
       </aside>
 
